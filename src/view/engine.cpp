@@ -2,6 +2,7 @@
 
 Engine::Engine(int width, int height){
     build_glfw_window(width, height);
+    create_instance();
 }
 
 Engine::~Engine(){
@@ -29,10 +30,53 @@ void Engine::build_glfw_window(int width, int height){
 }
 
 void Engine::run(){
+
+std::vector<std::thread> threads;
+        for(auto i =0;i<NUM_THREADS;i++){
+            threads.push_back(std::thread(threadFunc,instance,i));
+        }
+
+        for(auto& thread : threads){
+            thread.join();
+        }
+
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
 
         if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
                 glfwSetWindowShouldClose(window, true);
+        
+        
     }
+}
+
+void Engine::create_instance(){
+    instance = vkInit::create_instance("Vulkan multi thread");
+	dldi = vk::DispatchLoaderDynamic(instance, vkGetInstanceProcAddr);
+
+	if (vkLogging::Logger::get_logger()->get_debug_mode()) {
+		debugMessenger = vkLogging::make_debug_messenger(instance, dldi);
+	}
+	VkSurfaceKHR c_style_surface;
+	if (glfwCreateWindowSurface(instance, window, nullptr, &c_style_surface) != VK_SUCCESS) {
+		std::cout << "Failed to abstract glfw surface for Vulkan\n";
+        LOG_ERROR()
+	}
+	std::cout << "Successfully abstracted glfw surface for Vulkan\n";
+	//copy constructor converts to hpp convention
+	surface = c_style_surface;
+}
+
+std::mutex Engine::instanceMutex;
+
+void Engine::threadFunc(vk::Instance instance,int index){
+    std::unique_lock<std::mutex> lock(instanceMutex,std::defer_lock);
+    while(!lock.try_lock()){
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+
+    vk::Instance instance2=instance;
+    std::cout<<"thread "<<index<<" is using instance\n";
+
+    lock.unlock();
 }

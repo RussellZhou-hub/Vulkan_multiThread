@@ -1,6 +1,7 @@
 #pragma once
 #include "../config.h"
 #include "logging.h"
+#include "vkInit/instance.h"
 
 const uint32_t NUM_THREADS = 4;
 
@@ -13,4 +14,15 @@ public:
     GLFWwindow* window;
     void build_glfw_window(int width, int height);
     void run();
+
+    //instance-related variables
+    vk::Instance instance{nullptr};
+	vk::DebugUtilsMessengerEXT debugMessenger{ nullptr };
+	vk::DispatchLoaderDynamic dldi;
+	vk::SurfaceKHR surface;
+    void create_instance();
+
+    static std::mutex instanceMutex;
+
+    static void threadFunc(vk::Instance instance,int index);
 };

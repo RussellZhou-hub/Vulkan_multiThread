@@ -38,3 +38,5 @@
 
 #endif
 
+#define DEBUG_MESSAGE 1
+
