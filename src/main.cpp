@@ -1,4 +1,5 @@
 #include"config.h"
+#include"view/engine.h"
 
 /*
 struct RenderingResourcesVulkan
@@ -22,6 +23,12 @@ struct RenderingResourcesVulkan
 int main(){
 
     std::cout<<"hello, vulkan\n";
+
+    Engine* engine = new Engine(640,480);
+
+    engine->run();
+
+    delete engine;
 
     return 0;
 }

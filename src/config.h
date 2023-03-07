@@ -25,6 +25,7 @@
 #include<optional>
 #include<fstream>
 #include<sstream>
+#include <cstdio>
 #include<unordered_map>
 #include<thread>
 #include<atomic>
