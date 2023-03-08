@@ -1,15 +1,21 @@
 #include "engine.h"
 
 Engine::Engine(int width, int height){
-    build_glfw_window(width, height);
+    this->width=width;
+    this->height=height;
+
+    frameNumber_atomic.store(0); // initialize frame index
+
+    build_glfw_window();
     create_instance();
+    create_device();
 }
 
 Engine::~Engine(){
 
 }
 
-void Engine::build_glfw_window(int width, int height){
+void Engine::build_glfw_window(){
     //initialize glfw
 	glfwInit();
 
@@ -31,13 +37,14 @@ void Engine::build_glfw_window(int width, int height){
 
 void Engine::run(){
 
-std::vector<std::thread> threads;
+        std::vector<std::thread> threads;
         for(auto i =0;i<NUM_THREADS;i++){
-            threads.push_back(std::thread(threadFunc,instance,i));
+            threads.push_back(std::thread(threadFunc,instance,surface,i));
         }
 
         for(auto& thread : threads){
-            thread.join();
+            //thread.join();
+            thread.detach();
         }
 
     while (!glfwWindowShouldClose(window)) {
@@ -67,16 +74,51 @@ void Engine::create_instance(){
 	surface = c_style_surface;
 }
 
+void Engine::create_device(){
+    
+    physicalDevice = vkInit::choose_physical_device(instance);
+	device = vkInit::create_logical_device(physicalDevice, surface);
+	std::array<vk::Queue,2> queues = vkInit::get_queues(physicalDevice, device, surface);
+	graphicsQueue = queues[0];
+	presentQueue = queues[1];
+	create_swapchain();
+	frameNumber=0;
+	//frameNumberTotal.store(0);
+
+}
+
+void Engine::create_swapchain(){
+    vkInit::SwapChainBundle bundle = vkInit::create_swapchain(device, physicalDevice, surface, width, height);
+	swapchain = bundle.swapchain;
+	swapchainFrames = bundle.frames;
+	swapchainFormat = bundle.format;
+	swapchainExtent = bundle.extent;
+	maxFramesInFlight=static_cast<int>(swapchainFrames.size());
+
+	std::cout<<"maxFramesInFlight: "<<maxFramesInFlight<<" \n";
+
+	for (vkUtil::SwapChainFrame& frame : swapchainFrames) {
+		frame.logicalDevice = device;
+		frame.physicalDevice = physicalDevice;
+		frame.width = swapchainExtent.width;
+		frame.height = swapchainExtent.height;
+
+		frame.make_depth_resources();
+	}
+}
+
 std::mutex Engine::instanceMutex;
 
-void Engine::threadFunc(vk::Instance instance,int index){
-    std::unique_lock<std::mutex> lock(instanceMutex,std::defer_lock);
-    while(!lock.try_lock()){
-        std::this_thread::sleep_for(std::chrono::milliseconds(5));
-    }
+void Engine::threadFunc(vk::Instance instance,vk::SurfaceKHR surface,int index){
+    //std::unique_lock<std::mutex> lock(instanceMutex,std::defer_lock);
+    //while(!lock.try_lock()){
+    //    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    //}
+    std::cout<<"thread "<<index<<" is running\n";
+    vk::Device pDevice=vkInit::create_logical_device(physicalDevice,surface);
+    std::cout<<"thread "<<index<<" is using physicalDevice\n";
 
-    vk::Instance instance2=instance;
-    std::cout<<"thread "<<index<<" is using instance\n";
-
-    lock.unlock();
+    //lock.unlock();
 }
+
+vk::PhysicalDevice Engine::physicalDevice=nullptr;
