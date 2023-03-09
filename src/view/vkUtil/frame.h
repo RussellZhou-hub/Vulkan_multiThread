@@ -7,9 +7,9 @@ namespace vkUtil {
 		Describes the data to send to the shader for each frame.
 	*/
 	struct UBO {
-		glm::mat4 view;
-		glm::mat4 projection;
-		glm::mat4 viewProjection;
+		glm::mat4 model;
+        glm::mat4 view;
+        glm::mat4 projection;
 	};
 
 	/**

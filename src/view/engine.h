@@ -6,6 +6,9 @@
 #include "RenderThreadResource.h"
 #include "vkInit/swapchain.h"
 #include "vkUtil/frame.h"
+#include "vkInit/descriptors.h"
+#include "vkInit/pipeline.h"
+#include"vkInit/framebuffer.h"
 
 const uint32_t NUM_THREADS = 4;
 
@@ -45,6 +48,10 @@ public:
     void create_swapchain();
 
     RenderThreadResource renderThreadResources[NUM_THREADS];
+
+    void create_descriptor_set_layouts();
+    void create_pipeline();
+    void create_framebuffers();
 
     static std::mutex instanceMutex;
 

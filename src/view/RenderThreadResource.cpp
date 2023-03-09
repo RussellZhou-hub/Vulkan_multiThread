@@ -1,12 +1,11 @@
 #include "RenderThreadResource.h"
 
-RenderThreadResource::RenderThreadResource()
-        : mainCommandBuffer(VK_NULL_HANDLE)
-        , imageAvailableSemaphore(VK_NULL_HANDLE)
-        , finishedRenderingSemaphore(VK_NULL_HANDLE)
-        , fence(VK_NULL_HANDLE){
-
-    }
+RenderThreadResource::RenderThreadResource(){
+            mainCommandBuffer=nullptr;
+            imageAvailableSemaphore=nullptr;
+            finishedRenderingSemaphore=nullptr;
+            fence=nullptr;
+}
 
 RenderThreadResource::RenderThreadResource(vk::Instance instance,vk::SurfaceKHR surface){
     this->instance=instance;
