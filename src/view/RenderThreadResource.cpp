@@ -20,3 +20,10 @@ void RenderThreadResource::create_device(){
 	presentQueue = queues[1];
 }
 
+void RenderThreadResource::create_vertexbuffer(){
+
+}
+	
+void RenderThreadResource::create_indexbuffer(){
+
+}

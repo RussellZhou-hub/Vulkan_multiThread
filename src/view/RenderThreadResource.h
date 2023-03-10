@@ -4,6 +4,8 @@
 #include "vkInit/instance.h"
 #include "vkInit/device.h"
 #include "vkUtil/frame.h"
+#include "vkMesh/mesh.h"
+#include "garbage_collection.h"
 
 // every tread use its own RenderThreadResource object
 class RenderThreadResource
@@ -48,10 +50,18 @@ public:
 	vk::CommandPool commandPool;
 	vk::CommandBuffer mainCommandBuffer;
 
+	// vertex buffer
+	std::vector<vkMesh::Vertex> vertices;
+	std::vector<uint32_t> indices;
+
 	//Synchronization objects
 	int maxFramesInFlight,frameNumber;
 	std::atomic<int> frameNumber_atomic; //for multiThread rendering
 	std::atomic<int> frameTime_atomic; //for multiThread rendering
 
+	DeletionQueue _threadDeletionQueue;
+
     void create_device();
+	void create_vertexbuffer();
+	void create_indexbuffer();
 };

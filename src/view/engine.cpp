@@ -13,11 +13,8 @@ Engine::Engine(int width, int height){
 	create_pipeline();
     create_framebuffers();
 	create_commandbuffer();
-	
-    /*
-	make_frame_resources();
-    */
-	//create_assets();
+	create_frame_resources();
+	load_assets();
 }
 
 Engine::~Engine(){
@@ -201,6 +198,86 @@ void Engine::create_commandbuffer(){
 		vkInit::commandBufferInputChunk commandBufferInput = { device, res.commandPool, res.swapchainFrames };
 		res.mainCommandBuffer = vkInit::make_command_buffer(commandBufferInput);
 		vkInit::make_frame_command_buffers(commandBufferInput);
+	}
+}
+
+void Engine::create_frame_resources(){
+
+
+	vkInit::descriptorSetLayoutData bindings;
+	bindings.count=2;
+	bindings.indices.push_back(0);
+	bindings.indices.push_back(1);
+	bindings.types.push_back(vk::DescriptorType::eUniformBuffer);
+	bindings.types.push_back(vk::DescriptorType::eStorageBuffer);
+	bindings.counts.push_back(1);
+	bindings.counts.push_back(1);
+	bindings.stages.push_back(vk::ShaderStageFlagBits::eVertex);
+	bindings.stages.push_back(vk::ShaderStageFlagBits::eVertex);
+
+	for(auto& res:renderThreadResources){
+		res.frameDescriptorPool = vkInit::make_descriptor_pool(device,static_cast<uint32_t>(swapchainFrames.size()),bindings);
+
+		for(vkUtil::SwapChainFrame& frame: res.swapchainFrames){
+			frame.inFlight = vkInit::make_fence(device);
+			frame.imageAvailable = vkInit::make_semaphore(device);
+			frame.renderFinished = vkInit::make_semaphore(device);
+
+			frame.make_descriptor_resources();
+
+			frame.descriptorSet = vkInit::allocate_descriptor_set(device,res.frameDescriptorPool,res.frameSetLayout);
+		}
+	}
+}
+
+void Engine::load_assets(){
+
+	glm::vec3 frontNormal = glm::vec3(0.0f, 0.0f, 1.0f);
+	glm::vec3 backNormal = glm::vec3(0.0f, 0.0f, -1.0f);
+	glm::vec3 topNormal = glm::vec3(0.0f, 1.0f, 0.0f);
+	glm::vec3 bottomNormal = glm::vec3(0.0f, -1.0f, 0.0f);
+	glm::vec3 leftNormal = glm::vec3(-1.0f, 0.0f, 0.0f);
+	glm::vec3 rightNormal = glm::vec3(1.0f, 0.0f, 0.0f);
+
+	std::vector<vkMesh::Vertex> vertices = {
+    	{glm::vec3(-1.0f, -1.0f, 1.0f), frontNormal},
+    	{glm::vec3(1.0f, -1.0f, 1.0f), frontNormal},
+    	{glm::vec3(1.0f, 1.0f, 1.0f), frontNormal},
+    	{glm::vec3(-1.0f, 1.0f, 1.0f), frontNormal},
+    	{glm::vec3(-1.0f, -1.0f, -1.0f), backNormal},
+    	{glm::vec3(1.0f, -1.0f, -1.0f), backNormal},
+    	{glm::vec3(1.0f, 1.0f, -1.0f), backNormal},
+    	{glm::vec3(-1.0f, 1.0f, -1.0f), backNormal},
+    	{glm::vec3(-1.0f, 1.0f, 1.0f), topNormal},
+    	{glm::vec3(1.0f, 1.0f, 1.0f), topNormal},
+    	{glm::vec3(1.0f, 1.0f, -1.0f), topNormal},
+    	{glm::vec3(-1.0f, 1.0f, -1.0f), topNormal},
+    	{glm::vec3(-1.0f, -1.0f, 1.0f), bottomNormal},
+    	{glm::vec3(1.0f, -1.0f, 1.0f), bottomNormal},
+    	{glm::vec3(1.0f, -1.0f, -1.0f), bottomNormal},
+    	{glm::vec3(-1.0f, -1.0f, -1.0f), bottomNormal},
+    	{glm::vec3(-1.0f, -1.0f, 1.0f), leftNormal},
+    	{glm::vec3(-1.0f, 1.0f, 1.0f), leftNormal},
+    	{glm::vec3(-1.0f, 1.0f, -1.0f), leftNormal},
+    	{glm::vec3(-1.0f, -1.0f, -1.0f), leftNormal},
+    	{glm::vec3(1.0f, -1.0f, 1.0f), rightNormal},
+    	{glm::vec3(1.0f, 1.0f, 1.0f), rightNormal},
+    	{glm::vec3(1.0f, 1.0f, -1.0f), rightNormal},
+    	{glm::vec3(1.0f, -1.0f, -1.0f), rightNormal},
+	};
+
+	std::vector<uint32_t> indices = {
+    	0, 1, 2, 2, 3, 0, // Front face
+    	4, 5, 6, 6, 7, 4, //back face
+    	8, 9, 10, 10, 11, 8, // Top face
+    	12, 13, 14, 14, 15, 12, // Bottom face
+    	16, 17, 18, 18, 19, 16, // Left face
+    	20, 21, 22, 22, 23, 20, // Right face
+	};
+
+	for(auto& res:renderThreadResources){
+		res.vertices=vertices;
+		res.indices=indices;
 	}
 }
 

@@ -1,6 +1,7 @@
 #pragma once
 #include "../config.h"
 #include "logging.h"
+#include "garbage_collection.h"
 #include "vkInit/instance.h"
 #include "vkInit/device.h"
 #include "RenderThreadResource.h"
@@ -10,6 +11,7 @@
 #include "vkInit/pipeline.h"
 #include"vkInit/framebuffer.h"
 #include"vkInit/commands.h"
+#include"vkInit/sync.h"
 
 const uint32_t NUM_THREADS = 4;
 
@@ -54,8 +56,12 @@ public:
     void create_pipeline();
     void create_framebuffers();
     void create_commandbuffer();
+    void create_frame_resources();
+    void load_assets();
 
     static std::mutex instanceMutex;
+
+    DeletionQueue _mainDeletionQueue;
 
     static void threadFunc(vk::Instance instance,vk::SurfaceKHR surface,int index);
 };
