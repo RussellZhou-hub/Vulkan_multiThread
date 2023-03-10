@@ -9,6 +9,7 @@
 #include "vkInit/descriptors.h"
 #include "vkInit/pipeline.h"
 #include"vkInit/framebuffer.h"
+#include"vkInit/commands.h"
 
 const uint32_t NUM_THREADS = 4;
 
@@ -52,6 +53,7 @@ public:
     void create_descriptor_set_layouts();
     void create_pipeline();
     void create_framebuffers();
+    void create_commandbuffer();
 
     static std::mutex instanceMutex;
 

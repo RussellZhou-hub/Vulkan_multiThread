@@ -12,14 +12,9 @@ Engine::Engine(int width, int height){
     create_descriptor_set_layouts();
 	create_pipeline();
     create_framebuffers();
+	create_commandbuffer();
 	
     /*
-    commandPool = vkInit::make_command_pool(device, physicalDevice, surface, debugMode);
-
-	vkInit::commandBufferInputChunk commandBufferInput = { device, commandPool, swapchainFrames };
-	mainCommandBuffer = vkInit::make_command_buffer(commandBufferInput, debugMode);
-	vkInit::make_frame_command_buffers(commandBufferInput,debugMode);
-
 	make_frame_resources();
     */
 	//create_assets();
@@ -198,6 +193,15 @@ void Engine::create_framebuffers(){
 	    frameBufferInput.swapchainExtent = res.swapchainExtent;
 	    vkInit::make_framebuffers(frameBufferInput, res.swapchainFrames);
     }
+}
+
+void Engine::create_commandbuffer(){
+	for(auto& res:renderThreadResources){
+		res.commandPool = vkInit::make_command_pool(device, physicalDevice, surface);
+		vkInit::commandBufferInputChunk commandBufferInput = { device, res.commandPool, res.swapchainFrames };
+		res.mainCommandBuffer = vkInit::make_command_buffer(commandBufferInput);
+		vkInit::make_frame_command_buffers(commandBufferInput);
+	}
 }
 
 std::mutex Engine::instanceMutex;
