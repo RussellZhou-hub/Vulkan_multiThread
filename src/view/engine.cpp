@@ -10,8 +10,8 @@ Engine::Engine(int width, int height){
     create_instance();
     create_device();
     create_descriptor_set_layouts();
-	//create_pipeline();
-    //create_framebuffers();
+	create_pipeline();
+    create_framebuffers();
 	
     /*
     commandPool = vkInit::make_command_pool(device, physicalDevice, surface, debugMode);

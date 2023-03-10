@@ -42,7 +42,7 @@ using namespace vkMesh;
 		vk::VertexInputAttributeDescription dummy;
 		attributes.push_back(dummy);
 		attributes.push_back(dummy);
-		attributes.push_back(dummy);
+		//attributes.push_back(dummy);
 
 		//Pos
 		attributes[0].binding = 0;
