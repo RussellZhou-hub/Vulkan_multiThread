@@ -47,6 +47,13 @@ struct BufferInputChunk {
 	vk::MemoryPropertyFlags memoryProperties;
 };
 
+struct FinalizationChunk {
+	vk::Device logicalDevice;
+	vk::PhysicalDevice physicalDevice;
+	vk::CommandBuffer commandBuffer;
+	vk::Queue queue;
+};
+
 /**
 	holds a vulkan buffer and memory allocation
 */

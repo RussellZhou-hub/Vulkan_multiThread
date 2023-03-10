@@ -53,6 +53,8 @@ public:
 	// vertex buffer
 	std::vector<vkMesh::Vertex> vertices;
 	std::vector<uint32_t> indices;
+	Buffer vertexBuffer;
+	Buffer indexBuffer;
 
 	//Synchronization objects
 	int maxFramesInFlight,frameNumber;
@@ -62,6 +64,4 @@ public:
 	DeletionQueue _threadDeletionQueue;
 
     void create_device();
-	void create_vertexbuffer();
-	void create_indexbuffer();
 };

@@ -18,6 +18,11 @@ namespace vkMesh{
         glm::vec3 normal;
     };
 
+    class Mesh{
+    public:
+        int dummy;
+    };
+
 }
 
 

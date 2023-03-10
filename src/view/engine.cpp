@@ -15,6 +15,8 @@ Engine::Engine(int width, int height){
 	create_commandbuffer();
 	create_frame_resources();
 	load_assets();
+	create_vertexbuffer();
+	create_indexbuffer();
 }
 
 Engine::~Engine(){
@@ -279,6 +281,83 @@ void Engine::load_assets(){
 		res.vertices=vertices;
 		res.indices=indices;
 	}
+}
+
+void Engine::create_vertexbuffer(){
+	for(auto& res:renderThreadResources){
+		FinalizationChunk finalizationChunk;
+		finalizationChunk.logicalDevice = device;
+		finalizationChunk.physicalDevice=physicalDevice;
+		finalizationChunk.queue=graphicsQueue;
+		finalizationChunk.commandBuffer=res.mainCommandBuffer;
+
+		//make a staging buffer for vertices
+		BufferInputChunk inputChunk;
+		inputChunk.logicalDevice = finalizationChunk.logicalDevice;
+		inputChunk.physicalDevice = finalizationChunk.physicalDevice;
+		inputChunk.size = sizeof(vkMesh::Vertex) * res.vertices.size();
+		inputChunk.usage = vk::BufferUsageFlagBits::eTransferSrc;
+		inputChunk.memoryProperties = vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent;
+		Buffer stagingBuffer = vkUtil::createBuffer(inputChunk);
+
+		//fill it with vertex data
+		void* memoryLocation = device.mapMemory(stagingBuffer.bufferMemory, 0, inputChunk.size);
+		memcpy(memoryLocation, res.vertices.data(), inputChunk.size);
+		device.unmapMemory(stagingBuffer.bufferMemory);
+
+		//make the vertex buffer
+		inputChunk.usage = vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer;
+		inputChunk.memoryProperties = vk::MemoryPropertyFlagBits::eDeviceLocal;
+		res.vertexBuffer = vkUtil::createBuffer(inputChunk);
+
+		//copy to it
+		vkUtil::copyBuffer(stagingBuffer, res.vertexBuffer, inputChunk.size, finalizationChunk.queue, finalizationChunk.commandBuffer);
+
+		//destroy staging buffer
+		device.destroyBuffer(stagingBuffer.buffer);
+		device.freeMemory(stagingBuffer.bufferMemory);
+	}
+
+}
+	
+void Engine::create_indexbuffer(){
+	for(auto& res:renderThreadResources){
+		FinalizationChunk finalizationChunk;
+		finalizationChunk.logicalDevice = device;
+		finalizationChunk.physicalDevice=physicalDevice;
+		finalizationChunk.queue=graphicsQueue;
+		finalizationChunk.commandBuffer=res.mainCommandBuffer;
+
+		//make a staging buffer for indices
+		BufferInputChunk inputChunk;
+		inputChunk.logicalDevice = finalizationChunk.logicalDevice;
+		inputChunk.physicalDevice = finalizationChunk.physicalDevice;
+		inputChunk.size = sizeof(uint32_t) * res.indices.size();
+		inputChunk.usage = vk::BufferUsageFlagBits::eTransferSrc;
+		inputChunk.memoryProperties = vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent;
+		Buffer stagingBuffer = vkUtil::createBuffer(inputChunk);
+
+		//fill it with index data
+		void* memoryLocation = device.mapMemory(stagingBuffer.bufferMemory, 0, inputChunk.size);
+		memcpy(memoryLocation, res.indices.data(), inputChunk.size);
+		device.unmapMemory(stagingBuffer.bufferMemory);
+
+		//make the index buffer
+		inputChunk.usage = vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer;
+		inputChunk.memoryProperties = vk::MemoryPropertyFlagBits::eDeviceLocal;
+		res.indexBuffer = vkUtil::createBuffer(inputChunk);
+
+		//copy to it
+		vkUtil::copyBuffer(stagingBuffer, res.indexBuffer, inputChunk.size, finalizationChunk.queue, finalizationChunk.commandBuffer);
+
+		//destroy staging buffer
+		device.destroyBuffer(stagingBuffer.buffer);
+		device.freeMemory(stagingBuffer.bufferMemory);
+	}
+}
+
+void Engine::render(){
+	
 }
 
 std::mutex Engine::instanceMutex;

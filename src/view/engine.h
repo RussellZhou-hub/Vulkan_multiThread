@@ -12,6 +12,7 @@
 #include"vkInit/framebuffer.h"
 #include"vkInit/commands.h"
 #include"vkInit/sync.h"
+#include"vkUtil/memory.h"
 
 const uint32_t NUM_THREADS = 4;
 
@@ -58,6 +59,9 @@ public:
     void create_commandbuffer();
     void create_frame_resources();
     void load_assets();
+    void create_vertexbuffer();
+	void create_indexbuffer();
+    void render();
 
     static std::mutex instanceMutex;
 
