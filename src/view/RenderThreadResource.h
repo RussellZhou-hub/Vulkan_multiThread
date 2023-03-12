@@ -14,6 +14,7 @@ public:
 
     RenderThreadResource();
     RenderThreadResource(vk::Instance instance,vk::SurfaceKHR surface);
+	RenderThreadResource(const RenderThreadResource& res);
     VkSemaphore imageAvailableSemaphore;
     VkSemaphore finishedRenderingSemaphore;
     VkFence fence;
@@ -48,7 +49,7 @@ public:
 
 	//Command-related variables
 	vk::CommandPool commandPool;
-	vk::CommandBuffer mainCommandBuffer;
+	vk::CommandBuffer threadCommandBuffer;
 
 	// vertex buffer
 	std::vector<vkMesh::Vertex> vertices;
@@ -58,8 +59,6 @@ public:
 
 	//Synchronization objects
 	int maxFramesInFlight,frameNumber;
-	std::atomic<int> frameNumber_atomic; //for multiThread rendering
-	std::atomic<int> frameTime_atomic; //for multiThread rendering
 
 	DeletionQueue _threadDeletionQueue;
 

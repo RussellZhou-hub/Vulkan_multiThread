@@ -13,6 +13,8 @@
 #include"vkInit/commands.h"
 #include"vkInit/sync.h"
 #include"vkUtil/memory.h"
+#include"vkMesh/mesh.h"
+#include"camera.h"
 
 const uint32_t NUM_THREADS = 4;
 
@@ -45,11 +47,22 @@ public:
 
 	vk::Queue graphicsQueue{ nullptr };
 	vk::Queue presentQueue{ nullptr };
+    
+    //descriptor-related variables
+	vk::DescriptorSetLayout frameSetLayout;
+	vk::DescriptorPool frameDescriptorPool; //Descriptors bound on a "per frame" basis
+
 	vk::SwapchainKHR swapchain{ nullptr };
 	std::vector<vkUtil::SwapChainFrame> swapchainFrames;
 	vk::Format swapchainFormat;
 	vk::Extent2D swapchainExtent;
     void create_swapchain();
+    void recreate_swapchain();
+    void cleanup_swapchain();
+
+    //Command-related variables
+	vk::CommandPool commandPool;
+	vk::CommandBuffer mainCommandBuffer;
 
     RenderThreadResource renderThreadResources[NUM_THREADS];
 
@@ -63,9 +76,22 @@ public:
 	void create_indexbuffer();
     void render();
 
+    void update_frame(int imageIndex);
+
+    glm::vec3 cameraPos;
+    glm::vec3 cameraFront;
+    glm::vec3 cameraUp;
+    Camera camera;
+    void mouse_callback(GLFWwindow* window,double xpos, double ypos);
+    static void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
+    static void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
+    void scroll_process();
+    bool firstMouse;
+    double lastX,lastY,yaw,pitch;
+
     static std::mutex instanceMutex;
 
     DeletionQueue _mainDeletionQueue;
 
-    static void threadFunc(vk::Instance instance,vk::SurfaceKHR surface,int index);
+    static void thread_record_draw_commands(vk::Instance instance,vk::SurfaceKHR surface,RenderThreadResource res,int index,int imageIndex,vk::Fence inFlight,vk::Semaphore imageAvailable,vk::Semaphore renderFinished);
 };

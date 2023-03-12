@@ -4,6 +4,23 @@ Engine::Engine(int width, int height){
     this->width=width;
     this->height=height;
 
+	yaw=81.2;
+	pitch=-1.2;
+	glm::vec3 front;
+  	front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+  	front.y = sin(glm::radians(pitch));
+  	front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+  	cameraFront = glm::normalize(front);
+	cameraPos={-0.828088,0.0471648,-6.07124};
+	cameraUp = {0.0f,0.0f,-1.0f};
+	  /*
+	cameraPos={1.0f,0.0f,-1.0f};
+    cameraFront={-1.0f,0.0f,1.0f};
+    cameraUp = {0.0f,0.0f,-1.0f};
+	*/
+	firstMouse=true;
+
+
     frameNumber_atomic.store(0); // initialize frame index
 
     build_glfw_window();
@@ -43,23 +60,125 @@ void Engine::build_glfw_window(){
 	}
 }
 
+void Engine::mouse_callback(GLFWwindow* window,double xpos, double ypos){
+	if (isMouseLeftBtnPressed) {
+		if (firstMouse) {
+    	lastX = xpos;
+    	lastY = ypos;
+    	firstMouse = false;
+  		}
+
+  		double xoffset = xpos - lastX;
+  		double yoffset = lastY - ypos; // 翻转Y轴
+  		lastX = xpos;
+  		lastY = ypos;
+
+  		float sensitivity = 0.1f; // 鼠标灵敏度
+  		xoffset *= sensitivity;
+  		yoffset *= sensitivity;
+
+  		yaw += xoffset;
+  		pitch += yoffset;
+
+  		// 限制俯仰角的范围在[-89, 89]度之间
+  		if (pitch > 89.0f) {
+    		pitch = 89.0f;
+  		}
+  		if (pitch < -89.0f) {
+    		pitch = -89.0f;
+  		}
+
+  		glm::vec3 front;
+  		front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+  		front.y = sin(glm::radians(pitch));
+  		front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+  		cameraFront = glm::normalize(front);
+	}
+	else{
+		firstMouse = true;
+	}
+}
+
+void Engine::scroll_callback(GLFWwindow* window, double xoffset, double yoffset){
+	scrollOffset = yoffset;
+    isScrollChanged = true;
+}
+void Engine::mouse_button_callback(GLFWwindow* window, int button, int action, int mods){
+	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
+        isMouseLeftBtnPressed=true;
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE)
+        isMouseLeftBtnPressed = false;
+    if (button == GLFW_MOUSE_BUTTON_MIDDLE && action == GLFW_PRESS)
+        isMouseMiddleBtnPressed = true;
+    if (button == GLFW_MOUSE_BUTTON_MIDDLE && action == GLFW_RELEASE)
+        isMouseMiddleBtnPressed = false;
+}
+void Engine::scroll_process(){
+	if (isScrollChanged) {
+        const float cameraSpeed = 100.0f * camera.getDeltaTime(glfwGetTime()); // adjust accordingly
+        camera.fov -= (float)scrollOffset * cameraSpeed;
+        if (camera.fov < 1.0f)
+            camera.fov = 1.0f;
+        if (camera.fov > 45.0f)
+            camera.fov = 45.0f;
+        isScrollChanged = false;
+        //ubo.frameCount = 1; //camera moved
+    }
+}
+
+
 void Engine::run(){
-
-        std::vector<std::thread> threads;
-        for(auto i =0;i<NUM_THREADS;i++){
-            threads.push_back(std::thread(threadFunc,instance,surface,i));
-        }
-
-        for(auto& thread : threads){
-            //thread.join();
-            thread.detach();
-        }
 
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
 
-        if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+		{
+			if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
                 glfwSetWindowShouldClose(window, true);
+
+			glfwSetInputMode(window, GLFW_STICKY_MOUSE_BUTTONS, GLFW_CURSOR_DISABLED);
+            //glfwSetCursorPosCallback(window, (GLFWcursorposfun)mouse_callback);
+            double xpos, ypos;
+            glfwGetCursorPos(window, &xpos, &ypos);
+            mouse_callback(window, xpos, ypos);
+            glfwSetScrollCallback(window, scroll_callback);
+            glfwSetMouseButtonCallback(window, mouse_button_callback);
+            scroll_process();
+
+            const float cameraSpeed = 1.0f * camera.getDeltaTime(glfwGetTime()); // adjust accordingly
+            if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+                //camera.pos += cameraSpeed * camera.front;
+				cameraPos += cameraSpeed * cameraFront;
+                //ubo.frameCount = 1; //camera moved
+            }
+            if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+                //camera.pos -= cameraSpeed * camera.front;
+				cameraPos -= cameraSpeed * cameraFront;
+                //ubo.frameCount = 1; //camera moved
+            }
+
+            if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+                //camera.pos -= glm::normalize(glm::cross(camera.front, camera.up)) * cameraSpeed;
+				cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+                //ubo.frameCount = 1; //camera moved
+            }
+
+            if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+                //camera.pos += glm::normalize(glm::cross(camera.front, camera.up)) * cameraSpeed;
+				cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+                //ubo.frameCount = 1; //camera moved
+            }
+		}
+
+		std::cout<<"cameraPos: "<<cameraPos.x<<" "<<cameraPos.y<<" "<<cameraPos.z<<" \n"
+				 <<"cameraFront: "<<cameraFront.x<<" "<<cameraFront.y<<" "<<cameraFront.z<<" \n"
+				 <<"cameraUp: "<<cameraUp.x<<" "<<cameraUp.y<<" "<<cameraUp.z<<" \n";
+
+		std::cout<<"yaw: "<<yaw<<" \n"<<"pitch: "<<pitch<<" \n";
+
+				 
+
+        render();
         
         
     }
@@ -89,6 +208,12 @@ void Engine::create_device(){
 	std::array<vk::Queue,2> queues = vkInit::get_queues(physicalDevice, device, surface);
 	graphicsQueue = queues[0];
 	presentQueue = queues[1];
+	for(auto& res:renderThreadResources){
+		res.physicalDevice = physicalDevice;
+		res.device = device;
+		res.graphicsQueue = queues[0];
+		res.presentQueue = queues[1];
+	}
 	create_swapchain();
 	frameNumber=0;
 	//frameNumberTotal.store(0);
@@ -130,22 +255,60 @@ void Engine::create_swapchain(){
     }
 }
 
+void Engine::recreate_swapchain(){
+	width=0;
+	height=0;
+	while(width==0 || height==0){
+		glfwGetFramebufferSize(window,&width,&height);
+		glfwWaitEvents();
+	}
+	
+	device.waitIdle();
+
+	cleanup_swapchain();
+	create_swapchain();
+	create_framebuffers();
+	create_frame_resources();
+	for(auto& res:renderThreadResources){
+		vkInit::commandBufferInputChunk commandBufferInput = { device, res.commandPool, res.swapchainFrames };
+		vkInit::make_frame_command_buffers(commandBufferInput);
+	}
+	
+}
+
+void Engine::cleanup_swapchain(){
+	for (vkUtil::SwapChainFrame& frame : swapchainFrames) {
+		frame.destroy();
+	}
+
+	device.destroySwapchainKHR(swapchain);
+
+	for(auto& res:renderThreadResources){
+		device.destroyDescriptorPool(res.frameDescriptorPool);
+	}
+}
+
 void Engine::create_descriptor_set_layouts(){
 
+	vkInit::descriptorSetLayoutData bindings;
+	bindings.count=2;
+
+	bindings.indices.push_back(0);
+	bindings.types.push_back(vk::DescriptorType::eUniformBuffer);
+	bindings.counts.push_back(1);
+	bindings.stages.push_back(vk::ShaderStageFlagBits::eVertex);
+
+	bindings.indices.push_back(1);
+	bindings.types.push_back(vk::DescriptorType::eStorageBuffer);
+	bindings.counts.push_back(1);
+	bindings.stages.push_back(vk::ShaderStageFlagBits::eVertex);
+
+	// for main thread
+	frameSetLayout=vkInit::make_descriptor_set_layout(device,bindings);
+
+	// for child theread
     for(auto i=0;i<NUM_THREADS;i++){
-        vkInit::descriptorSetLayoutData bindings;
-	    bindings.count=2;
-
-	    bindings.indices.push_back(0);
-	    bindings.types.push_back(vk::DescriptorType::eUniformBuffer);
-	    bindings.counts.push_back(1);
-	    bindings.stages.push_back(vk::ShaderStageFlagBits::eVertex);
-
-	    bindings.indices.push_back(1);
-	    bindings.types.push_back(vk::DescriptorType::eStorageBuffer);
-	    bindings.counts.push_back(1);
-	    bindings.stages.push_back(vk::ShaderStageFlagBits::eVertex);
-
+		
         renderThreadResources[i].frameSetLayout=vkInit::make_descriptor_set_layout(device,bindings);
 
         /* 
@@ -195,10 +358,17 @@ void Engine::create_framebuffers(){
 }
 
 void Engine::create_commandbuffer(){
+	//for main thread
+	commandPool = vkInit::make_command_pool(device, physicalDevice, surface);
+	vkInit::commandBufferInputChunk commandBufferInput = { device, commandPool, swapchainFrames };
+	mainCommandBuffer = vkInit::make_command_buffer(commandBufferInput);
+	vkInit::make_frame_command_buffers(commandBufferInput);
+
+	// for child thread
 	for(auto& res:renderThreadResources){
 		res.commandPool = vkInit::make_command_pool(device, physicalDevice, surface);
 		vkInit::commandBufferInputChunk commandBufferInput = { device, res.commandPool, res.swapchainFrames };
-		res.mainCommandBuffer = vkInit::make_command_buffer(commandBufferInput);
+		res.threadCommandBuffer = vkInit::make_command_buffer(commandBufferInput);
 		vkInit::make_frame_command_buffers(commandBufferInput);
 	}
 }
@@ -217,6 +387,21 @@ void Engine::create_frame_resources(){
 	bindings.stages.push_back(vk::ShaderStageFlagBits::eVertex);
 	bindings.stages.push_back(vk::ShaderStageFlagBits::eVertex);
 
+
+	// for main thread
+	frameDescriptorPool = vkInit::make_descriptor_pool(device,static_cast<uint32_t>(swapchainFrames.size()),bindings);
+	// for main thread swapchainFrames
+	for(vkUtil::SwapChainFrame& frame: swapchainFrames){
+		frame.inFlight = vkInit::make_fence(device);
+		frame.imageAvailable = vkInit::make_semaphore(device);
+		frame.renderFinished = vkInit::make_semaphore(device);
+
+		frame.make_descriptor_resources();
+
+		frame.descriptorSet = vkInit::allocate_descriptor_set(device,frameDescriptorPool,frameSetLayout);
+	}
+
+	// for child thread
 	for(auto& res:renderThreadResources){
 		res.frameDescriptorPool = vkInit::make_descriptor_pool(device,static_cast<uint32_t>(swapchainFrames.size()),bindings);
 
@@ -289,7 +474,7 @@ void Engine::create_vertexbuffer(){
 		finalizationChunk.logicalDevice = device;
 		finalizationChunk.physicalDevice=physicalDevice;
 		finalizationChunk.queue=graphicsQueue;
-		finalizationChunk.commandBuffer=res.mainCommandBuffer;
+		finalizationChunk.commandBuffer=res.threadCommandBuffer;
 
 		//make a staging buffer for vertices
 		BufferInputChunk inputChunk;
@@ -326,7 +511,7 @@ void Engine::create_indexbuffer(){
 		finalizationChunk.logicalDevice = device;
 		finalizationChunk.physicalDevice=physicalDevice;
 		finalizationChunk.queue=graphicsQueue;
-		finalizationChunk.commandBuffer=res.mainCommandBuffer;
+		finalizationChunk.commandBuffer=res.threadCommandBuffer;
 
 		//make a staging buffer for indices
 		BufferInputChunk inputChunk;
@@ -356,13 +541,140 @@ void Engine::create_indexbuffer(){
 	}
 }
 
-void Engine::render(){
+void Engine::update_frame(int imageIndex){
+	vkUtil::SwapChainFrame _frame = swapchainFrames[imageIndex];
+
+	vkUtil::UBO ubo = {};
+  	ubo.model = glm::mat4(1.0f);
+  	ubo.view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
+  	ubo.projection = glm::perspective(glm::radians(45.0f),
+      swapchainExtent.width / (float) swapchainExtent.height, 0.1f, 10.0f);
+  	ubo.projection[1][1] *= -1; // 翻转Y轴坐标系以匹配Vulkan
+
+  	_frame.cameraData.model = ubo.model;
+	_frame.cameraData.view = ubo.view;
+	_frame.cameraData.projection = ubo.projection;
+	memcpy(_frame.cameraDataWriteLocation, &(_frame.cameraData), sizeof(vkUtil::UBO));
+
+	swapchainFrames[imageIndex].write_descriptor_set();
 	
+	for(auto& res:renderThreadResources){
+		memcpy(res.swapchainFrames[imageIndex].cameraDataWriteLocation, &(_frame.cameraData), sizeof(vkUtil::UBO));
+
+		res.swapchainFrames[imageIndex].write_descriptor_set();
+	}
+	
+}
+
+void Engine::render(){
+	int frameIndex=frameNumber_atomic.load();
+
+	device.waitForFences(1, &swapchainFrames[frameIndex].inFlight, VK_TRUE, UINT64_MAX);
+	uint32_t imageIndex;
+	//vk::ResultValue<uint32_t> acquire;
+	try{
+		vk::ResultValue acquire = device.acquireNextImageKHR(swapchain, UINT64_MAX, swapchainFrames[frameIndex].imageAvailable, nullptr);
+		imageIndex=acquire.value;
+	} catch(vk::OutOfDateKHRError){
+		recreate_swapchain();
+		return;
+	}
+	
+
+	vk::CommandBuffer commandBuffer = swapchainFrames[imageIndex].commandBuffer;
+
+	
+#ifdef VK_MAKE_VERSION
+	VULKAN_HPP_NAMESPACE::CommandBufferResetFlags flags={};
+	VULKAN_HPP_NAMESPACE::DispatchLoaderStatic d VULKAN_HPP_DEFAULT_DISPATCHER_ASSIGNMENT ;
+	commandBuffer.reset(flags,d);
+#else 
+	commandBuffer.reset();
+#endif
+
+	update_frame(imageIndex);
+
+	std::vector<std::thread> threads;
+    //for(auto i =0;i<NUM_THREADS;i++){
+	for(auto i =0;i<1;i++){
+            threads.push_back(std::thread(
+				thread_record_draw_commands,
+				instance,surface,renderThreadResources[i],i,imageIndex,
+				swapchainFrames[imageIndex].inFlight,
+				swapchainFrames[frameIndex].imageAvailable,
+				swapchainFrames[frameIndex].renderFinished
+				));
+    }
+
+    for(auto& thread : threads){
+        thread.join();
+        //thread.detach();
+    }
+
+	vk::SubmitInfo submitInfo = {};
+
+	vk::Semaphore waitSemaphores[] = { swapchainFrames[frameIndex].imageAvailable };
+	vk::PipelineStageFlags waitStages[] = { vk::PipelineStageFlagBits::eColorAttachmentOutput };
+	submitInfo.waitSemaphoreCount = 1;
+	submitInfo.pWaitSemaphores = waitSemaphores;
+	submitInfo.pWaitDstStageMask = waitStages;
+
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &commandBuffer;
+
+	vk::Semaphore signalSemaphores[] = { swapchainFrames[frameIndex].renderFinished };
+	submitInfo.signalSemaphoreCount = 1;
+	submitInfo.pSignalSemaphores = signalSemaphores;
+
+	//device.resetFences(1, &swapchainFrames[frameIndex].inFlight);
+	/*
+	try {
+		graphicsQueue.submit(submitInfo, swapchainFrames[frameIndex].inFlight); 
+	}
+	catch (vk::SystemError err) {
+		
+		#ifdef DEBUG_MESSAGE
+			std::cout << "failed to submit draw command buffer!" << std::endl;
+		#endif
+	}
+	*/
+	
+
+	vk::PresentInfoKHR presentInfo = {};
+	presentInfo.waitSemaphoreCount = 1;
+	presentInfo.pWaitSemaphores = signalSemaphores;
+
+	vk::SwapchainKHR swapChains[] = { swapchain };
+	presentInfo.swapchainCount = 1;
+	presentInfo.pSwapchains = swapChains;
+
+	presentInfo.pImageIndices = &imageIndex;
+
+	vk::Result present;
+	
+	try{
+		present=presentQueue.presentKHR(presentInfo);
+	}
+	catch(vk::OutOfDateKHRError error){
+		present = vk::Result::eErrorOutOfDateKHR;
+	}
+	
+
+	if(present==vk::Result::eErrorOutOfDateKHR || present==vk::Result::eSuboptimalKHR){
+		std::cout<<"Recreate" << std::endl;
+		recreate_swapchain();
+		return;
+	}
+
+	frameNumber=(frameNumber+1) % maxFramesInFlight;
+	frameNumber_atomic.store((frameIndex+1)% maxFramesInFlight);
+
+	//device.waitIdle();
 }
 
 std::mutex Engine::instanceMutex;
 
-void Engine::threadFunc(vk::Instance instance,vk::SurfaceKHR surface,int index){
+void Engine::thread_record_draw_commands(vk::Instance instance,vk::SurfaceKHR surface,RenderThreadResource res,int index,int imageIndex,vk::Fence inFlight,vk::Semaphore imageAvailable,vk::Semaphore renderFinished){
     //std::unique_lock<std::mutex> lock(instanceMutex,std::defer_lock);
     //while(!lock.try_lock()){
     //    std::this_thread::sleep_for(std::chrono::milliseconds(5));
@@ -372,6 +684,109 @@ void Engine::threadFunc(vk::Instance instance,vk::SurfaceKHR surface,int index){
     //std::cout<<"thread "<<index<<" is using physicalDevice\n";
 
     //lock.unlock();
+
+	vk::CommandBuffer commandBuffer = res.swapchainFrames[imageIndex].commandBuffer;
+
+	
+#ifdef VK_MAKE_VERSION
+	VULKAN_HPP_NAMESPACE::CommandBufferResetFlags flags={};
+	VULKAN_HPP_NAMESPACE::DispatchLoaderStatic d VULKAN_HPP_DEFAULT_DISPATCHER_ASSIGNMENT ;
+	commandBuffer.reset(flags,d);
+#else 
+	commandBuffer.reset();
+#endif
+
+	vk::CommandBufferBeginInfo beginInfo = {};
+	try {
+		commandBuffer.begin(beginInfo);
+	}
+	catch (vk::SystemError err) {
+		#ifdef DEBUG_MESSAGE
+			std::cout << "Failed to begin recording command buffer!" << std::endl;
+		#endif
+	}
+
+	vk::RenderPassBeginInfo renderPassInfo = {};
+	renderPassInfo.renderPass = res.renderpass;
+	renderPassInfo.framebuffer = res.swapchainFrames[imageIndex].framebuffer;
+	renderPassInfo.renderArea.offset.x = 0;
+	renderPassInfo.renderArea.offset.y = 0;
+	renderPassInfo.renderArea.extent = res.swapchainExtent;
+
+	vk::ClearValue colorClear;
+	std::array<float, 4> colors = { 1.0f, 0.5f, 0.25f, 1.0f };
+	colorClear.color = vk::ClearColorValue(colors);
+	vk::ClearValue depthClear;
+
+	#ifdef VK_MAKE_VERSION
+	depthClear.depthStencil = vk::ClearDepthStencilValue({ 1.0f },{0});
+#else
+	depthClear.depthStencil = vk::ClearDepthStencilValue({ 1.0f,0 });
+#endif
+	std::vector<vk::ClearValue> clearValues = { {colorClear, depthClear} };
+
+	renderPassInfo.clearValueCount = clearValues.size();
+	renderPassInfo.pClearValues = clearValues.data();
+
+	commandBuffer.beginRenderPass(&renderPassInfo, vk::SubpassContents::eInline);
+
+	commandBuffer.bindDescriptorSets(
+		vk::PipelineBindPoint::eGraphics,
+		res.pipelineLayout,0,res.swapchainFrames[imageIndex].descriptorSet,nullptr);
+
+
+	commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, res.pipeline);
+
+	vk::Buffer vertexBuffers[] = { res.vertexBuffer.buffer };
+	vk::DeviceSize offsets[] = {0};
+	commandBuffer.bindVertexBuffers(0,1,vertexBuffers,offsets);
+	commandBuffer.bindIndexBuffer(res.indexBuffer.buffer, 0, vk::IndexType::eUint32);
+
+	//todo: descriptor set for textures
+	//commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, res.pipelineLayout, 1, res.descriptorSet, nullptr);
+
+	int firstIndex=0;
+	int startInstance=0;
+	commandBuffer.drawIndexed(res.indices.size(), 1, firstIndex, 0, startInstance);
+	
+	commandBuffer.endRenderPass();
+
+	try {
+		commandBuffer.end();
+	}
+	catch (vk::SystemError err) {
+		
+		#ifdef DEBUG_MESSAGE
+			std::cout << "failed to record command buffer!" << std::endl;
+		#endif
+	}
+
+	vk::SubmitInfo submitInfo = {};
+
+	vk::Semaphore waitSemaphores[] = { imageAvailable };
+	vk::PipelineStageFlags waitStages[] = { vk::PipelineStageFlagBits::eColorAttachmentOutput };
+	submitInfo.waitSemaphoreCount = 1;
+	submitInfo.pWaitSemaphores = waitSemaphores;
+	submitInfo.pWaitDstStageMask = waitStages;
+
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &commandBuffer;
+
+	vk::Semaphore signalSemaphores[] = { renderFinished };
+	submitInfo.signalSemaphoreCount = 1;
+	submitInfo.pSignalSemaphores = signalSemaphores;
+
+	res.device.resetFences(1, &inFlight);
+	
+	try {
+		res.graphicsQueue.submit(submitInfo, inFlight); 
+	}
+	catch (vk::SystemError err) {
+		
+		#ifdef DEBUG_MESSAGE
+			std::cout << "failed to submit draw command buffer!" << std::endl;
+		#endif
+	}
 }
 
 vk::PhysicalDevice Engine::physicalDevice=nullptr;

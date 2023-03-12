@@ -95,6 +95,8 @@ void vkUtil::SwapChainFrame::write_descriptor_set() {
 	logicalDevice.waitIdle();
 	logicalDevice.updateDescriptorSets(writeInfo, nullptr);
 
+	/*
+
 	vk::WriteDescriptorSet writeInfo2;
 	writeInfo2.dstSet = descriptorSet;
 	writeInfo2.dstBinding = 1;
@@ -104,6 +106,7 @@ void vkUtil::SwapChainFrame::write_descriptor_set() {
 	writeInfo2.pBufferInfo = &modelBufferDescriptor;
 
 	logicalDevice.updateDescriptorSets(writeInfo2, nullptr);
+	*/
 }
 
 void vkUtil::SwapChainFrame::destroy() {
