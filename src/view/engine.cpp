@@ -179,9 +179,31 @@ void Engine::run(){
 				 
 
         render();
-        
+        calculateFrameRate();
         
     }
+}
+
+void Engine::calculateFrameRate(){
+	if(timing.lastTime==-1){
+		timing.lastTime = glfwGetTime();
+		return;
+	}
+	timing.currentTime = glfwGetTime();
+	double delta = timing.currentTime - timing.lastTime;
+
+	if (delta >= 1) {
+		int framerate{ std::max(1, int(timing.numFrames / delta)) };
+		std::stringstream title;
+		title <<"Vulkan Parallel rendering: " << framerate << " fps.";
+		
+		glfwSetWindowTitle(window, title.str().c_str());
+		timing.lastTime = timing.currentTime;
+		timing.numFrames = -1;
+		timing.frameTime = float(1000.0 / framerate);
+	}
+
+	++timing.numFrames;
 }
 
 void Engine::create_instance(){

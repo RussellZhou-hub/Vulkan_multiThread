@@ -15,6 +15,7 @@
 #include"vkUtil/memory.h"
 #include"vkMesh/mesh.h"
 #include"camera.h"
+#include"timing.h"
 
 const uint32_t NUM_THREADS = 4;
 
@@ -90,6 +91,9 @@ public:
     double lastX,lastY,yaw,pitch;
 
     static std::mutex instanceMutex;
+
+    Timing timing;
+    void calculateFrameRate();
 
     DeletionQueue _mainDeletionQueue;
 
