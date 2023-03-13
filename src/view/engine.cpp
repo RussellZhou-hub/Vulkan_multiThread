@@ -436,8 +436,14 @@ void Engine::create_frame_resources(){
 	// for main thread swapchainFrames
 	for(vkUtil::SwapChainFrame& frame: swapchainFrames){
 		frame.inFlight = vkInit::make_fence(device);
+		for(auto i = 0; i<NUM_THREADS;++i){
+			frame.inFlights.push_back(vkInit::make_fence(device));
+		}
 		frame.imageAvailable = vkInit::make_semaphore(device);
 		frame.renderFinished = vkInit::make_semaphore(device);
+		for(auto i =0;i<NUM_THREADS;i++){
+			frame.renderFinisheds.push_back(vkInit::make_semaphore(device));
+		}
 
 		frame.make_descriptor_resources();
 
@@ -505,16 +511,97 @@ void Engine::load_assets(){
     	20, 21, 22, 22, 23, 20, // Right face
 	};
 
-	for(auto& res:renderThreadResources){
-		res.vertices=vertices;
-		res.indices=indices;
+	for(auto& vertex:vertices){  // differt location of the mesh for different threads
+			vertex = {vertex.pos-glm::vec3(2.5f, 1.0f, 0.0f),vertex.normal};
+		}
+	for(auto i=0;i<4;++i){
+		for(auto& vertex:vertices){  // differt location of the mesh for different threads
+			vertex = {vertex.pos+glm::vec3(2.5f, 1.0f, 0.0f),vertex.normal};
+		}
+		
+
+		vkMesh::Mesh mesh;
+		mesh.vertices=vertices;
+		mesh.indices=indices;
+
+		meshs.push_back(mesh);
 	}
 
-	// debug thread 2
-	for(auto& vertex:vertices){
-		vertex = {vertex.pos+glm::vec3(2.0f, 0.0f, 0.0f),vertex.normal};
+	
+	int index=0;
+	for(auto& res:renderThreadResources){
+		
+		res.vertices=meshs[index].vertices;
+		res.indices=meshs[index].indices;
+		index++;
 	}
-	renderThreadResources[1].vertices=vertices;
+	
+
+	if(NUM_THREADS==1){
+		vkMesh::Mesh mesh;
+		mesh.vertices=meshs[0].vertices;
+		mesh.indices=meshs[0].indices;
+		for(auto i =1;i<meshs.size();++i){
+			mesh.merge(meshs[i]);
+		}
+		renderThreadResources[0].vertices=mesh.vertices;
+		renderThreadResources[0].indices=mesh.indices;
+	}
+	else if(NUM_THREADS==2){
+		vkMesh::Mesh mesh;
+		mesh.vertices=meshs[0].vertices;
+		mesh.indices=meshs[0].indices;
+		int num = meshs.size()/2;
+		for(auto i =1;i<num;++i){
+			mesh.merge(meshs[i]);
+		}
+		renderThreadResources[0].vertices=mesh.vertices;
+		renderThreadResources[0].indices=mesh.indices;
+
+		vkMesh::Mesh mesh2;
+		mesh2.vertices=meshs[num].vertices;
+		mesh2.indices=meshs[num].indices;
+		for(auto i =1;i<meshs.size();++i){
+			mesh2.merge(meshs[i]);
+		}
+		renderThreadResources[1].vertices=mesh2.vertices;
+		renderThreadResources[1].indices=mesh2.indices;
+	}
+	else if(NUM_THREADS==3){
+		vkMesh::Mesh mesh;
+		mesh.vertices=meshs[0].vertices;
+		mesh.indices=meshs[0].indices;
+		int num = meshs.size()/3;
+		for(auto i =1;i<num;++i){
+			mesh.merge(meshs[i]);
+		}
+		renderThreadResources[0].vertices=mesh.vertices;
+		renderThreadResources[0].indices=mesh.indices;
+
+		vkMesh::Mesh mesh2;
+		mesh2.vertices=meshs[num].vertices;
+		mesh2.indices=meshs[num].indices;
+		int num2=2*meshs.size()/3;
+		for(auto i =1;i<num2;++i){
+			mesh2.merge(meshs[i]);
+		}
+		renderThreadResources[1].vertices=mesh2.vertices;
+		renderThreadResources[1].indices=mesh2.indices;
+
+		vkMesh::Mesh mesh3;
+		mesh3.vertices=meshs[num2].vertices;
+		mesh3.indices=meshs[num2].indices;
+		for(auto i =1;i<meshs.size();++i){
+			mesh3.merge(meshs[i]);
+		}
+		renderThreadResources[2].vertices=mesh3.vertices;
+		renderThreadResources[2].indices=mesh3.indices;
+	}
+	else{
+
+	}
+
+	
 }
 
 void Engine::create_vertexbuffer(){
@@ -618,7 +705,8 @@ void Engine::update_frame(int imageIndex){
 void Engine::render(){
 	int frameIndex=frameNumber_atomic.load();
 
-	device.waitForFences(1, &swapchainFrames[frameIndex].inFlight, VK_TRUE, UINT64_MAX);
+	//device.waitForFences(1, &swapchainFrames[frameIndex].inFlight, VK_TRUE, UINT64_MAX);  // for single thread rendering
+	device.waitForFences(swapchainFrames[frameIndex].inFlights.size(), swapchainFrames[frameIndex].inFlights.data(), VK_TRUE, UINT64_MAX);    // for multi thread rendering
 	uint32_t imageIndex;
 	//vk::ResultValue<uint32_t> acquire;
 	try{
@@ -702,8 +790,8 @@ void Engine::render(){
 	vk::Semaphore signalSemaphores[] = { swapchainFrames[frameIndex].renderFinished };
 	//submitInfo.signalSemaphoreCount = 1;
 	//submitInfo.pSignalSemaphores = signalSemaphores;
-	submitInfo.signalSemaphoreCount = 1;
-	submitInfo.pSignalSemaphores = waitSemaphores;
+	submitInfo.signalSemaphoreCount = 0;
+	submitInfo.pSignalSemaphores = nullptr;
 
 	//device.resetFences(1, &swapchainFrames[frameIndex].inFlight);
 
@@ -718,15 +806,17 @@ void Engine::render(){
 	}
 
 	std::vector<std::thread> threads;
-    //for(auto i =0;i<NUM_THREADS;i++){
-	for(auto i =0;i<1;i++){
+    for(auto i =0;i<NUM_THREADS;i++){
+	//for(auto i =0;i<1;i++){
             threads.push_back(std::thread(
 				thread_record_draw_commands,
 				window,
 				instance,surface,renderThreadResources[i],i,imageIndex,
 				swapchainFrames[imageIndex].inFlight,
 				swapchainFrames[frameIndex].imageAvailable,
-				swapchainFrames[frameIndex].renderFinished
+				swapchainFrames[frameIndex].renderFinished,
+				swapchainFrames[frameIndex].renderFinisheds,
+				swapchainFrames[frameIndex].inFlights
 				));
     }
 
@@ -752,8 +842,10 @@ void Engine::render(){
 	
 
 	vk::PresentInfoKHR presentInfo = {};
-	presentInfo.waitSemaphoreCount = 1;
-	presentInfo.pWaitSemaphores = signalSemaphores;
+	//presentInfo.waitSemaphoreCount = 1;
+	//presentInfo.pWaitSemaphores = signalSemaphores;
+	presentInfo.waitSemaphoreCount = swapchainFrames[frameIndex].renderFinisheds.size();
+	presentInfo.pWaitSemaphores = swapchainFrames[frameIndex].renderFinisheds.data();
 
 	vk::SwapchainKHR swapChains[] = { swapchain };
 	presentInfo.swapchainCount = 1;
@@ -783,9 +875,15 @@ void Engine::render(){
 	//device.waitIdle();
 }
 
-std::mutex Engine::instanceMutex;
+std::mutex Engine::graphicQueueMutex;
 
-void Engine::thread_record_draw_commands(GLFWwindow* window,vk::Instance instance,vk::SurfaceKHR surface,RenderThreadResource res,int index,int imageIndex,vk::Fence inFlight,vk::Semaphore imageAvailable,vk::Semaphore renderFinished){
+void Engine::thread_record_draw_commands(
+		GLFWwindow* window,vk::Instance instance,vk::SurfaceKHR surface,
+		RenderThreadResource res,int index,int imageIndex,vk::Fence inFlight,
+		vk::Semaphore imageAvailable,vk::Semaphore renderFinished,
+		std::vector<vk::Semaphore> renderFinisheds,
+		std::vector<vk::Fence> inFlights
+		){
     //std::unique_lock<std::mutex> lock(instanceMutex,std::defer_lock);
     //while(!lock.try_lock()){
     //    std::this_thread::sleep_for(std::chrono::milliseconds(5));
@@ -879,21 +977,31 @@ void Engine::thread_record_draw_commands(GLFWwindow* window,vk::Instance instanc
 
 	vk::Semaphore waitSemaphores[] = { imageAvailable };
 	vk::PipelineStageFlags waitStages[] = { vk::PipelineStageFlagBits::eColorAttachmentOutput };
-	submitInfo.waitSemaphoreCount = 1;
-	submitInfo.pWaitSemaphores = waitSemaphores;
+	//submitInfo.waitSemaphoreCount = 1;
+	//submitInfo.pWaitSemaphores = waitSemaphores;
+	submitInfo.waitSemaphoreCount = 0;
+	submitInfo.pWaitSemaphores = nullptr;
 	submitInfo.pWaitDstStageMask = waitStages;
 
 	submitInfo.commandBufferCount = 1;
 	submitInfo.pCommandBuffers = &commandBuffer;
 
 	vk::Semaphore signalSemaphores[] = { renderFinished };
+	//submitInfo.signalSemaphoreCount = 1;
+	//submitInfo.pSignalSemaphores = signalSemaphores;
 	submitInfo.signalSemaphoreCount = 1;
-	submitInfo.pSignalSemaphores = signalSemaphores;
+	submitInfo.pSignalSemaphores = &renderFinisheds[index];
 
-	res.device.resetFences(1, &inFlight);
+	res.device.resetFences(1, &inFlights[index]);
+	
+	//***********syn on threads************************
+	std::unique_lock<std::mutex> lock(graphicQueueMutex,std::defer_lock);
+    while(!lock.try_lock()){
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
 	
 	try {
-		res.graphicsQueue.submit(submitInfo, inFlight); 
+		res.graphicsQueue.submit(submitInfo, inFlights[index]); 
 	}
 	catch (vk::SystemError err) {
 		
@@ -901,6 +1009,14 @@ void Engine::thread_record_draw_commands(GLFWwindow* window,vk::Instance instanc
 			std::cout << "failed to submit draw command buffer!" << std::endl;
 		#endif
 	}
+
+    if (glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS) {
+    	std::cout<<"thread "<<index<<" is using graphicQueue\n";
+	}
+	
+
+    lock.unlock();
+	//***********end************************
 }
 
 vk::PhysicalDevice Engine::physicalDevice=nullptr;

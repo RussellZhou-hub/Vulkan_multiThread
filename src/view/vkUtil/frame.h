@@ -38,7 +38,9 @@ namespace vkUtil {
 
 		//Sync objects
 		vk::Semaphore imageAvailable, renderFinished;
+		std::vector<vk::Semaphore> renderFinisheds;
 		vk::Fence inFlight;
+		std::vector<vk::Fence> inFlights;
 
 		//Resources
 		UBO cameraData;

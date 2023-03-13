@@ -82,6 +82,8 @@ public:
 	void create_indexbuffer();
     void render();
 
+    std::vector<vkMesh::Mesh> meshs;
+
     void update_frame(int imageIndex);
 
     glm::vec3 cameraPos;
@@ -95,12 +97,18 @@ public:
     bool firstMouse;
     double lastX,lastY,yaw,pitch;
 
-    static std::mutex instanceMutex;
+    static std::mutex graphicQueueMutex;
 
     Timing timing;
     void calculateFrameRate();
 
     DeletionQueue _mainDeletionQueue;
 
-    static void thread_record_draw_commands(GLFWwindow* window,vk::Instance instance,vk::SurfaceKHR surface,RenderThreadResource res,int index,int imageIndex,vk::Fence inFlight,vk::Semaphore imageAvailable,vk::Semaphore renderFinished);
+    static void thread_record_draw_commands(
+        GLFWwindow* window,vk::Instance instance,vk::SurfaceKHR surface,
+        RenderThreadResource res,int index,int imageIndex,vk::Fence inFlight,
+        vk::Semaphore imageAvailable,vk::Semaphore renderFinished,
+        std::vector<vk::Semaphore> renderFinisheds,
+        std::vector<vk::Fence> inFlights
+        );
 };

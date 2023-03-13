@@ -64,3 +64,15 @@ using namespace vkMesh;
 
 		return attributes;
 	}
+
+	void vkMesh::Mesh::merge(Mesh& inputMesh){
+		int startIndex= vertices.size();
+		int num=inputMesh.vertices.size();
+		for(auto i=0;i<num;++i){
+			vertices.push_back(inputMesh.vertices[i]);
+		}
+		num=inputMesh.indices.size();
+		for(auto i=0;i<num;++i){
+			indices.push_back(inputMesh.indices[i]+static_cast<uint32_t>(startIndex));
+		}
+	}

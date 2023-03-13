@@ -20,7 +20,9 @@ namespace vkMesh{
 
     class Mesh{
     public:
-        int dummy;
+        std::vector<Vertex> vertices;
+        std::vector<uint32_t> indices;
+        void merge(Mesh& inputMesh);
     };
 
 }
