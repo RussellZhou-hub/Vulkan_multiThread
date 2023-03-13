@@ -48,6 +48,11 @@ public:
 
 	vk::Queue graphicsQueue{ nullptr };
 	vk::Queue presentQueue{ nullptr };
+
+    //pipeline-related variables
+	vk::PipelineLayout pipelineLayout;
+	vk::RenderPass renderpass;
+	vk::Pipeline pipeline;
     
     //descriptor-related variables
 	vk::DescriptorSetLayout frameSetLayout;
@@ -97,5 +102,5 @@ public:
 
     DeletionQueue _mainDeletionQueue;
 
-    static void thread_record_draw_commands(vk::Instance instance,vk::SurfaceKHR surface,RenderThreadResource res,int index,int imageIndex,vk::Fence inFlight,vk::Semaphore imageAvailable,vk::Semaphore renderFinished);
+    static void thread_record_draw_commands(GLFWwindow* window,vk::Instance instance,vk::SurfaceKHR surface,RenderThreadResource res,int index,int imageIndex,vk::Fence inFlight,vk::Semaphore imageAvailable,vk::Semaphore renderFinished);
 };

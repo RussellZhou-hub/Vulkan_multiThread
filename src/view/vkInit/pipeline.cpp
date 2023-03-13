@@ -177,6 +177,38 @@ vk::PipelineVertexInputStateCreateInfo vkInit::create_vertex_input_info(
 
 	}
 
+	vk::RenderPass vkInit::create_thread_renderpass(
+		vk::Device device, vk::Format swapchainImageFormat, vk::Format depthFormat) {
+
+		std::vector<vk::AttachmentDescription> attachments;
+		std::vector<vk::AttachmentReference> attachmentReferences;
+
+		//Color Buffer
+		vk::AttachmentDescription attachmentDescription = create_color_attachment(swapchainImageFormat);
+		attachmentDescription.loadOp = vk::AttachmentLoadOp::eLoad;
+		attachments.push_back(attachmentDescription);
+		attachmentReferences.push_back(create_color_attachment_reference());
+
+		//Depth Buffer
+		vk::AttachmentDescription depthAttachmentDescription = create_depth_attachment(depthFormat);
+		depthAttachmentDescription.loadOp = vk::AttachmentLoadOp::eLoad;
+		attachments.push_back(depthAttachmentDescription);
+		attachmentReferences.push_back(create_depth_attachment_reference());
+
+		//Renderpasses are broken down into subpasses, there's always at least one.
+		vk::SubpassDescription subpass = create_subpass(attachmentReferences);
+
+		//Now create the renderpass
+		vk::RenderPassCreateInfo renderpassInfo = create_renderpass_info(attachments, subpass);
+		try {
+			return device.createRenderPass(renderpassInfo);
+		}
+		catch (vk::SystemError err) {
+			vkLogging::Logger::get_logger()->print("Failed to create renderpass!");
+		}
+
+	}
+
 	vk::AttachmentDescription vkInit::create_color_attachment(const vk::Format& swapchainImageFormat) {
 
 		vk::AttachmentDescription colorAttachment = {};
@@ -239,6 +271,7 @@ vk::PipelineVertexInputStateCreateInfo vkInit::create_vertex_input_info(
 
 		return subpass;
 	}
+
 
 	vk::RenderPassCreateInfo vkInit::create_renderpass_info(
 		const std::vector<vk::AttachmentDescription>& attachments, 
@@ -337,10 +370,20 @@ vk::PipelineVertexInputStateCreateInfo vkInit::create_vertex_input_info(
 
 		//Renderpass
 		vkLogging::Logger::get_logger()->print("Create RenderPass");
-		vk::RenderPass renderpass = create_renderpass(
-			specification.device, specification.swapchainImageFormat, 
-			specification.depthFormat
-		);
+		vk::RenderPass renderpass;
+		if(specification.isChildThread){
+			renderpass = create_thread_renderpass(
+				specification.device, specification.swapchainImageFormat, 
+				specification.depthFormat
+			);
+		}
+		else{
+			renderpass = create_renderpass(
+				specification.device, specification.swapchainImageFormat, 
+				specification.depthFormat
+			);
+		}
+		
 		pipelineInfo.renderPass = renderpass;
 		pipelineInfo.subpass = 0;
 

@@ -168,15 +168,16 @@ void Engine::run(){
 				cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
                 //ubo.frameCount = 1; //camera moved
             }
+
+			// for print debug info
+			if (glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS) {
+				std::cout<<"cameraPos: "<<cameraPos.x<<" "<<cameraPos.y<<" "<<cameraPos.z<<" \n"
+				 		 <<"cameraFront: "<<cameraFront.x<<" "<<cameraFront.y<<" "<<cameraFront.z<<" \n"
+				 		 <<"cameraUp: "<<cameraUp.x<<" "<<cameraUp.y<<" "<<cameraUp.z<<" \n";
+
+				std::cout<<"yaw: "<<yaw<<" \n"<<"pitch: "<<pitch<<" \n";
+			}
 		}
-
-		std::cout<<"cameraPos: "<<cameraPos.x<<" "<<cameraPos.y<<" "<<cameraPos.z<<" \n"
-				 <<"cameraFront: "<<cameraFront.x<<" "<<cameraFront.y<<" "<<cameraFront.z<<" \n"
-				 <<"cameraUp: "<<cameraUp.x<<" "<<cameraUp.y<<" "<<cameraUp.z<<" \n";
-
-		std::cout<<"yaw: "<<yaw<<" \n"<<"pitch: "<<pitch<<" \n";
-
-				 
 
         render();
         calculateFrameRate();
@@ -356,6 +357,18 @@ void Engine::create_pipeline(){
 	specification.depthFormat = swapchainFrames[0].depthFormat;
 	//specification.descriptorSetLayouts = { frameSetLayout /* , meshSetLayout */ };
 
+	// for main thread
+	specification.descriptorSetLayouts = { frameSetLayout /* , meshSetLayout */ };
+        vkInit::GraphicsPipelineOutBundle output = vkInit::create_graphics_pipeline(
+		specification
+	    );
+
+	pipelineLayout = output.layout;
+	renderpass = output.renderpass;
+	pipeline = output.pipeline;
+
+	// for child thread
+	specification.isChildThread=true;
     for(auto& res:renderThreadResources){
         specification.descriptorSetLayouts = { res.frameSetLayout /* , meshSetLayout */ };
         vkInit::GraphicsPipelineOutBundle output = vkInit::create_graphics_pipeline(
@@ -370,6 +383,14 @@ void Engine::create_pipeline(){
 }
 
 void Engine::create_framebuffers(){
+	// for main thread
+	vkInit::framebufferInput frameBufferInput;
+	frameBufferInput.device = device;
+	frameBufferInput.renderpass = renderpass;
+	frameBufferInput.swapchainExtent = swapchainExtent;
+	vkInit::make_framebuffers(frameBufferInput, swapchainFrames);
+
+	// for child thread
     for(auto& res:renderThreadResources){
         vkInit::framebufferInput frameBufferInput;
 	    frameBufferInput.device = device;
@@ -488,6 +509,12 @@ void Engine::load_assets(){
 		res.vertices=vertices;
 		res.indices=indices;
 	}
+
+	// debug thread 2
+	for(auto& vertex:vertices){
+		vertex = {vertex.pos+glm::vec3(2.0f, 0.0f, 0.0f),vertex.normal};
+	}
+	renderThreadResources[1].vertices=vertices;
 }
 
 void Engine::create_vertexbuffer(){
@@ -616,22 +643,50 @@ void Engine::render(){
 
 	update_frame(imageIndex);
 
-	std::vector<std::thread> threads;
-    //for(auto i =0;i<NUM_THREADS;i++){
-	for(auto i =0;i<1;i++){
-            threads.push_back(std::thread(
-				thread_record_draw_commands,
-				instance,surface,renderThreadResources[i],i,imageIndex,
-				swapchainFrames[imageIndex].inFlight,
-				swapchainFrames[frameIndex].imageAvailable,
-				swapchainFrames[frameIndex].renderFinished
-				));
-    }
+	vk::CommandBufferBeginInfo beginInfo = {};
+	try {
+		commandBuffer.begin(beginInfo);
+	}
+	catch (vk::SystemError err) {
+		#ifdef DEBUG_MESSAGE
+			std::cout << "Failed to begin recording command buffer!" << std::endl;
+		#endif
+	}
+	
+	vk::RenderPassBeginInfo renderPassInfo = {};
+	renderPassInfo.renderPass = renderpass;
+	renderPassInfo.framebuffer = swapchainFrames[imageIndex].framebuffer;
+	renderPassInfo.renderArea.offset.x = 0;
+	renderPassInfo.renderArea.offset.y = 0;
+	renderPassInfo.renderArea.extent = swapchainExtent;
 
-    for(auto& thread : threads){
-        thread.join();
-        //thread.detach();
-    }
+	vk::ClearValue colorClear;
+	std::array<float, 4> colors = { 1.0f, 0.5f, 0.25f, 1.0f };
+	colorClear.color = vk::ClearColorValue(colors);
+	vk::ClearValue depthClear;
+
+	#ifdef VK_MAKE_VERSION
+	depthClear.depthStencil = vk::ClearDepthStencilValue({ 1.0f },{0});
+#else
+	depthClear.depthStencil = vk::ClearDepthStencilValue({ 1.0f,0 });
+#endif
+	std::vector<vk::ClearValue> clearValues = { {colorClear,depthClear} };
+
+	renderPassInfo.clearValueCount = clearValues.size();
+	renderPassInfo.pClearValues = clearValues.data();
+
+	commandBuffer.beginRenderPass(&renderPassInfo, vk::SubpassContents::eInline);
+	commandBuffer.endRenderPass();
+
+	try {
+		commandBuffer.end();
+	}
+	catch (vk::SystemError err) {
+		
+		#ifdef DEBUG_MESSAGE
+			std::cout << "failed to record command buffer!" << std::endl;
+		#endif
+	}
 
 	vk::SubmitInfo submitInfo = {};
 
@@ -645,8 +700,42 @@ void Engine::render(){
 	submitInfo.pCommandBuffers = &commandBuffer;
 
 	vk::Semaphore signalSemaphores[] = { swapchainFrames[frameIndex].renderFinished };
+	//submitInfo.signalSemaphoreCount = 1;
+	//submitInfo.pSignalSemaphores = signalSemaphores;
 	submitInfo.signalSemaphoreCount = 1;
-	submitInfo.pSignalSemaphores = signalSemaphores;
+	submitInfo.pSignalSemaphores = waitSemaphores;
+
+	//device.resetFences(1, &swapchainFrames[frameIndex].inFlight);
+
+	try {
+		graphicsQueue.submit(submitInfo, nullptr); 
+	}
+	catch (vk::SystemError err) {
+		
+		#ifdef DEBUG_MESSAGE
+			std::cout << "failed to submit draw command buffer!" << std::endl;
+		#endif
+	}
+
+	std::vector<std::thread> threads;
+    //for(auto i =0;i<NUM_THREADS;i++){
+	for(auto i =0;i<1;i++){
+            threads.push_back(std::thread(
+				thread_record_draw_commands,
+				window,
+				instance,surface,renderThreadResources[i],i,imageIndex,
+				swapchainFrames[imageIndex].inFlight,
+				swapchainFrames[frameIndex].imageAvailable,
+				swapchainFrames[frameIndex].renderFinished
+				));
+    }
+
+    for(auto& thread : threads){
+        thread.join();
+        //thread.detach();
+    }
+
+	
 
 	//device.resetFences(1, &swapchainFrames[frameIndex].inFlight);
 	/*
@@ -696,12 +785,14 @@ void Engine::render(){
 
 std::mutex Engine::instanceMutex;
 
-void Engine::thread_record_draw_commands(vk::Instance instance,vk::SurfaceKHR surface,RenderThreadResource res,int index,int imageIndex,vk::Fence inFlight,vk::Semaphore imageAvailable,vk::Semaphore renderFinished){
+void Engine::thread_record_draw_commands(GLFWwindow* window,vk::Instance instance,vk::SurfaceKHR surface,RenderThreadResource res,int index,int imageIndex,vk::Fence inFlight,vk::Semaphore imageAvailable,vk::Semaphore renderFinished){
     //std::unique_lock<std::mutex> lock(instanceMutex,std::defer_lock);
     //while(!lock.try_lock()){
     //    std::this_thread::sleep_for(std::chrono::milliseconds(5));
     //}
-    std::cout<<"thread "<<index<<" is running\n";
+	if (glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS) {
+		std::cout<<"thread "<<index<<" is running\n";
+	}
     //vk::Device pDevice=vkInit::create_logical_device(physicalDevice,surface);
     //std::cout<<"thread "<<index<<" is using physicalDevice\n";
 
@@ -747,8 +838,9 @@ void Engine::thread_record_draw_commands(vk::Instance instance,vk::SurfaceKHR su
 #endif
 	std::vector<vk::ClearValue> clearValues = { {colorClear, depthClear} };
 
-	renderPassInfo.clearValueCount = clearValues.size();
-	renderPassInfo.pClearValues = clearValues.data();
+	renderPassInfo.clearValueCount = 0;
+	renderPassInfo.pClearValues = nullptr;
+	//renderPassInfo.pClearValues = clearValues.data();
 
 	commandBuffer.beginRenderPass(&renderPassInfo, vk::SubpassContents::eInline);
 

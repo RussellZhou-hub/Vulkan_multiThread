@@ -16,6 +16,7 @@ namespace vkInit {
 		vk::Extent2D swapchainExtent;
 		vk::Format swapchainImageFormat, depthFormat;
 		std::vector<vk::DescriptorSetLayout> descriptorSetLayouts;
+		bool isChildThread;
 	};
 
 	/**
@@ -132,6 +133,8 @@ namespace vkInit {
 		\returns Make a color attachment refernce
 	*/
 	vk::AttachmentReference create_color_attachment_reference();
+	vk::RenderPass create_thread_renderpass(
+		vk::Device device, vk::Format swapchainImageFormat, vk::Format depthFormat);
 
 	/**
 		Make a depth attachment description
