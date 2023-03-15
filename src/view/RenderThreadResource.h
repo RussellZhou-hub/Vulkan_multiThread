@@ -14,7 +14,6 @@ public:
 
     RenderThreadResource();
     RenderThreadResource(vk::Instance instance,vk::SurfaceKHR surface);
-	RenderThreadResource(const RenderThreadResource& res);
     VkSemaphore imageAvailableSemaphore;
     VkSemaphore finishedRenderingSemaphore;
     VkFence fence;

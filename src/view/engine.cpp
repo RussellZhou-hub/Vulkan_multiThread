@@ -1,6 +1,6 @@
 #include "engine.h"
 
-Engine::Engine(int width, int height){
+Engine::Engine(int width, int height):pool(NUM_THREADS){
     this->width=width;
     this->height=height;
 
@@ -330,7 +330,7 @@ void Engine::create_descriptor_set_layouts(){
 	frameSetLayout=vkInit::make_descriptor_set_layout(device,bindings);
 
 	// for child theread
-    for(auto i=0;i<NUM_THREADS;i++){
+    for(auto i=0;i<NUM_MESH;i++){
 		
         renderThreadResources[i].frameSetLayout=vkInit::make_descriptor_set_layout(device,bindings);
 
@@ -436,12 +436,12 @@ void Engine::create_frame_resources(){
 	// for main thread swapchainFrames
 	for(vkUtil::SwapChainFrame& frame: swapchainFrames){
 		frame.inFlight = vkInit::make_fence(device);
-		for(auto i = 0; i<NUM_THREADS;++i){
+		for(auto i = 0; i<NUM_MESH;++i){
 			frame.inFlights.push_back(vkInit::make_fence(device));
 		}
 		frame.imageAvailable = vkInit::make_semaphore(device);
 		frame.renderFinished = vkInit::make_semaphore(device);
-		for(auto i =0;i<NUM_THREADS;i++){
+		for(auto i =0;i<NUM_MESH;i++){
 			frame.renderFinisheds.push_back(vkInit::make_semaphore(device));
 		}
 
@@ -514,7 +514,7 @@ void Engine::load_assets(){
 	for(auto& vertex:vertices){  // differt location of the mesh for different threads
 			vertex = {vertex.pos-glm::vec3(2.5f, 1.0f, 0.0f),vertex.normal};
 		}
-	for(auto i=0;i<4;++i){
+	for(auto i=0;i<NUM_MESH;++i){
 		for(auto& vertex:vertices){  // differt location of the mesh for different threads
 			vertex = {vertex.pos+glm::vec3(2.5f, 1.0f, 0.0f),vertex.normal};
 		}
@@ -524,75 +524,77 @@ void Engine::load_assets(){
 		mesh.vertices=vertices;
 		mesh.indices=indices;
 
-		meshs.push_back(mesh);
+		meshes.push_back(mesh);
 	}
 
 	
 	int index=0;
 	for(auto& res:renderThreadResources){
 		
-		res.vertices=meshs[index].vertices;
-		res.indices=meshs[index].indices;
+		res.vertices=meshes[index].vertices;
+		res.indices=meshes[index].indices;
 		index++;
 	}
-	
 
+	
+	
+	/*
 	if(NUM_THREADS==1){
 		vkMesh::Mesh mesh;
-		mesh.vertices=meshs[0].vertices;
-		mesh.indices=meshs[0].indices;
-		for(auto i =1;i<meshs.size();++i){
-			mesh.merge(meshs[i]);
+		mesh.vertices=meshes[0].vertices;
+		mesh.indices=meshes[0].indices;
+		for(auto i =1;i<meshes.size();++i){
+			mesh.merge(meshes[i]);
 		}
 		renderThreadResources[0].vertices=mesh.vertices;
 		renderThreadResources[0].indices=mesh.indices;
 	}
 	else if(NUM_THREADS==2){
 		vkMesh::Mesh mesh;
-		mesh.vertices=meshs[0].vertices;
-		mesh.indices=meshs[0].indices;
-		int num = meshs.size()/2;
+		mesh.vertices=meshes[0].vertices;
+		mesh.indices=meshes[0].indices;
+		int num = meshes.size()/2;
 		for(auto i =1;i<num;++i){
-			mesh.merge(meshs[i]);
+			mesh.merge(meshes[i]);
 		}
 		renderThreadResources[0].vertices=mesh.vertices;
 		renderThreadResources[0].indices=mesh.indices;
 
 		vkMesh::Mesh mesh2;
-		mesh2.vertices=meshs[num].vertices;
-		mesh2.indices=meshs[num].indices;
-		for(auto i =1;i<meshs.size();++i){
-			mesh2.merge(meshs[i]);
+		mesh2.vertices=meshes[num].vertices;
+		mesh2.indices=meshes[num].indices;
+		for(auto i =1;i<meshes.size();++i){
+			mesh2.merge(meshes[i]);
 		}
 		renderThreadResources[1].vertices=mesh2.vertices;
 		renderThreadResources[1].indices=mesh2.indices;
 	}
 	else if(NUM_THREADS==3){
 		vkMesh::Mesh mesh;
-		mesh.vertices=meshs[0].vertices;
-		mesh.indices=meshs[0].indices;
-		int num = meshs.size()/3;
+		mesh.vertices=meshes[0].vertices;
+		mesh.indices=meshes[0].indices;
+		int num = meshes.size()/3;
 		for(auto i =1;i<num;++i){
-			mesh.merge(meshs[i]);
+			mesh.merge(meshes[i]);
 		}
 		renderThreadResources[0].vertices=mesh.vertices;
 		renderThreadResources[0].indices=mesh.indices;
 
 		vkMesh::Mesh mesh2;
-		mesh2.vertices=meshs[num].vertices;
-		mesh2.indices=meshs[num].indices;
-		int num2=2*meshs.size()/3;
+		mesh2.vertices=meshes[num].vertices;
+		mesh2.indices=meshes[num].indices;
+		int num2=2*meshes.size()/3;
 		for(auto i =1;i<num2;++i){
-			mesh2.merge(meshs[i]);
+			mesh2.merge(meshes[i]);
 		}
 		renderThreadResources[1].vertices=mesh2.vertices;
 		renderThreadResources[1].indices=mesh2.indices;
 
 		vkMesh::Mesh mesh3;
-		mesh3.vertices=meshs[num2].vertices;
-		mesh3.indices=meshs[num2].indices;
-		for(auto i =1;i<meshs.size();++i){
-			mesh3.merge(meshs[i]);
+		mesh3.vertices=meshes[num2].vertices;
+		mesh3.indices=meshes[num2].indices;
+		for(auto i =1;i<meshes.size();++i){
+			mesh3.merge(meshes[i]);
 		}
 		renderThreadResources[2].vertices=mesh3.vertices;
 		renderThreadResources[2].indices=mesh3.indices;
@@ -600,7 +602,7 @@ void Engine::load_assets(){
 	else{
 
 	}
-
+	*/
 	
 }
 
@@ -684,7 +686,7 @@ void Engine::update_frame(int imageIndex){
   	ubo.model = glm::mat4(1.0f);
   	ubo.view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
   	ubo.projection = glm::perspective(glm::radians(45.0f),
-      swapchainExtent.width / (float) swapchainExtent.height, 0.1f, 10.0f);
+      swapchainExtent.width / (float) swapchainExtent.height, 0.1f, 100.0f);
   	ubo.projection[1][1] *= -1; // 翻转Y轴坐标系以匹配Vulkan
 
   	_frame.cameraData.model = ubo.model;
@@ -805,6 +807,24 @@ void Engine::render(){
 		#endif
 	}
 
+	std::vector<std::future<void>> futures;
+	int meshes_size = meshes.size();
+    for (int i = 0; i < meshes_size; ++i)
+        futures.emplace_back(pool.enqueue(&Engine::thread_record_draw_commands,
+				meshes[i],
+				window,
+				instance,surface,renderThreadResources[i],i,imageIndex,
+				swapchainFrames[imageIndex].inFlight,
+				swapchainFrames[frameIndex].imageAvailable,
+				swapchainFrames[frameIndex].renderFinished,
+				swapchainFrames[frameIndex].renderFinisheds,
+				swapchainFrames[frameIndex].inFlights
+		));
+
+	for (auto &&future : futures)
+        future.wait();  // wait for asyn operation to finish
+
+/*
 	std::vector<std::thread> threads;
     for(auto i =0;i<NUM_THREADS;i++){
 	//for(auto i =0;i<1;i++){
@@ -824,6 +844,7 @@ void Engine::render(){
         thread.join();
         //thread.detach();
     }
+*/
 
 	
 
@@ -878,6 +899,7 @@ void Engine::render(){
 std::mutex Engine::graphicQueueMutex;
 
 void Engine::thread_record_draw_commands(
+		vkMesh::Mesh mesh,
 		GLFWwindow* window,vk::Instance instance,vk::SurfaceKHR surface,
 		RenderThreadResource res,int index,int imageIndex,vk::Fence inFlight,
 		vk::Semaphore imageAvailable,vk::Semaphore renderFinished,
@@ -918,50 +940,57 @@ void Engine::thread_record_draw_commands(
 	}
 
 	vk::RenderPassBeginInfo renderPassInfo = {};
-	renderPassInfo.renderPass = res.renderpass;
-	renderPassInfo.framebuffer = res.swapchainFrames[imageIndex].framebuffer;
-	renderPassInfo.renderArea.offset.x = 0;
-	renderPassInfo.renderArea.offset.y = 0;
-	renderPassInfo.renderArea.extent = res.swapchainExtent;
+		renderPassInfo.renderPass = res.renderpass;
+		renderPassInfo.framebuffer = res.swapchainFrames[imageIndex].framebuffer;
+		renderPassInfo.renderArea.offset.x = 0;
+		renderPassInfo.renderArea.offset.y = 0;
+		renderPassInfo.renderArea.extent = res.swapchainExtent;
 
-	vk::ClearValue colorClear;
-	std::array<float, 4> colors = { 1.0f, 0.5f, 0.25f, 1.0f };
-	colorClear.color = vk::ClearColorValue(colors);
-	vk::ClearValue depthClear;
+		vk::ClearValue colorClear;
+		std::array<float, 4> colors = { 1.0f, 0.5f, 0.25f, 1.0f };
+		colorClear.color = vk::ClearColorValue(colors);
+		vk::ClearValue depthClear;
 
-	#ifdef VK_MAKE_VERSION
-	depthClear.depthStencil = vk::ClearDepthStencilValue({ 1.0f },{0});
-#else
-	depthClear.depthStencil = vk::ClearDepthStencilValue({ 1.0f,0 });
-#endif
-	std::vector<vk::ClearValue> clearValues = { {colorClear, depthClear} };
+		#ifdef VK_MAKE_VERSION
+		depthClear.depthStencil = vk::ClearDepthStencilValue({ 1.0f },{0});
+		#else
+		depthClear.depthStencil = vk::ClearDepthStencilValue({ 1.0f,0 });
+		#endif
+		std::vector<vk::ClearValue> clearValues = { {colorClear, depthClear} };
 
-	renderPassInfo.clearValueCount = 0;
-	renderPassInfo.pClearValues = nullptr;
-	//renderPassInfo.pClearValues = clearValues.data();
+		renderPassInfo.clearValueCount = 0;
+		renderPassInfo.pClearValues = nullptr;
+		//renderPassInfo.pClearValues = clearValues.data();
 
-	commandBuffer.beginRenderPass(&renderPassInfo, vk::SubpassContents::eInline);
+		//for(auto i =0;i<meshes.size();++i){
+		create_vertex_index_buffer(
+			mesh,
+			res
+		);
+		//}
 
-	commandBuffer.bindDescriptorSets(
-		vk::PipelineBindPoint::eGraphics,
-		res.pipelineLayout,0,res.swapchainFrames[imageIndex].descriptorSet,nullptr);
+		commandBuffer.beginRenderPass(&renderPassInfo, vk::SubpassContents::eInline);
+
+		commandBuffer.bindDescriptorSets(
+			vk::PipelineBindPoint::eGraphics,
+			res.pipelineLayout,0,res.swapchainFrames[imageIndex].descriptorSet,nullptr);
 
 
-	commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, res.pipeline);
+		commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics, res.pipeline);
+			
+		//vk::Buffer vertexBuffers[] = { res.vertexBuffer.buffer };
+		vk::DeviceSize offsets[] = {0};
+		commandBuffer.bindVertexBuffers(0,1,&mesh.vertexBuffer.buffer,offsets);
+		commandBuffer.bindIndexBuffer(mesh.indexBuffer.buffer, 0, vk::IndexType::eUint32);
 
-	vk::Buffer vertexBuffers[] = { res.vertexBuffer.buffer };
-	vk::DeviceSize offsets[] = {0};
-	commandBuffer.bindVertexBuffers(0,1,vertexBuffers,offsets);
-	commandBuffer.bindIndexBuffer(res.indexBuffer.buffer, 0, vk::IndexType::eUint32);
+		//todo: descriptor set for textures
+		//commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, res.pipelineLayout, 1, res.descriptorSet, nullptr);
 
-	//todo: descriptor set for textures
-	//commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, res.pipelineLayout, 1, res.descriptorSet, nullptr);
-
-	int firstIndex=0;
-	int startInstance=0;
-	commandBuffer.drawIndexed(res.indices.size(), 1, firstIndex, 0, startInstance);
+		int firstIndex=0;
+		int startInstance=0;
+		commandBuffer.drawIndexed(mesh.indices.size(), 1, firstIndex, 0, startInstance);
 	
-	commandBuffer.endRenderPass();
+		commandBuffer.endRenderPass();
 
 	try {
 		commandBuffer.end();
@@ -1017,6 +1046,111 @@ void Engine::thread_record_draw_commands(
 
     lock.unlock();
 	//***********end************************
+
+	res.device.waitIdle();
+	res.device.destroy(mesh.vertexBuffer.buffer);
+	res.device.freeMemory(mesh.vertexBuffer.bufferMemory);
+	res.device.destroy(mesh.indexBuffer.buffer);
+	res.device.freeMemory(mesh.indexBuffer.bufferMemory);
+}
+
+void Engine::render_meshs(
+        std::vector<vkMesh::Mesh> meshes,
+		RenderThreadResource res,
+        int index,
+        int imageIndex
+    ){
+		vk::CommandBuffer commandBuffer = res.swapchainFrames[imageIndex].commandBuffer;
+
+		
+}
+
+void Engine::create_vertex_index_buffer(
+        vkMesh::Mesh& mesh,
+		RenderThreadResource res
+){
+	FinalizationChunk finalizationChunk;
+	finalizationChunk.logicalDevice = res.device;
+	finalizationChunk.physicalDevice=res.physicalDevice;
+	finalizationChunk.queue=res.graphicsQueue;
+	finalizationChunk.commandBuffer=res.threadCommandBuffer;
+
+	//make a staging buffer for vertices
+	BufferInputChunk inputChunk;
+	inputChunk.logicalDevice = finalizationChunk.logicalDevice;
+	inputChunk.physicalDevice = finalizationChunk.physicalDevice;
+	inputChunk.size = sizeof(vkMesh::Vertex) * mesh.vertices.size();
+	inputChunk.usage = vk::BufferUsageFlagBits::eTransferSrc;
+	inputChunk.memoryProperties = vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent;
+	Buffer stagingBuffer = vkUtil::createBuffer(inputChunk);
+
+	//fill it with vertex data
+	void* memoryLocation = res.device.mapMemory(stagingBuffer.bufferMemory, 0, inputChunk.size);
+	memcpy(memoryLocation, mesh.vertices.data(), inputChunk.size);
+	res.device.unmapMemory(stagingBuffer.bufferMemory);
+
+	//make the vertex buffer
+	inputChunk.usage = vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer;
+	inputChunk.memoryProperties = vk::MemoryPropertyFlagBits::eDeviceLocal;
+	mesh.vertexBuffer = vkUtil::createBuffer(inputChunk);
+
+	//***********syn on threads************************
+	{
+		std::unique_lock<std::mutex> lock(graphicQueueMutex,std::defer_lock);
+    	while(!lock.try_lock()){
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    	}
+		//copy to it
+		vkUtil::copyBuffer(stagingBuffer, mesh.vertexBuffer, inputChunk.size, finalizationChunk.queue, finalizationChunk.commandBuffer);
+	
+    	lock.unlock();
+	}
+	
+	//***********end************************
+
+		
+
+	//destroy staging buffer
+	res.device.destroyBuffer(stagingBuffer.buffer);
+	res.device.freeMemory(stagingBuffer.bufferMemory);
+
+	//*****************************************
+
+	//make a staging buffer for indices
+		
+	inputChunk.size = sizeof(uint32_t) * mesh.indices.size();
+	inputChunk.usage = vk::BufferUsageFlagBits::eTransferSrc;
+	inputChunk.memoryProperties = vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent;
+	stagingBuffer = vkUtil::createBuffer(inputChunk);
+
+	//fill it with index data
+	memoryLocation = res.device.mapMemory(stagingBuffer.bufferMemory, 0, inputChunk.size);
+	memcpy(memoryLocation, mesh.indices.data(), inputChunk.size);
+	res.device.unmapMemory(stagingBuffer.bufferMemory);
+
+	//make the index buffer
+	inputChunk.usage = vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer;
+	inputChunk.memoryProperties = vk::MemoryPropertyFlagBits::eDeviceLocal;
+	mesh.indexBuffer = vkUtil::createBuffer(inputChunk);
+
+	//***********syn on threads************************
+	{
+	std::unique_lock<std::mutex> lock(graphicQueueMutex,std::defer_lock);
+    while(!lock.try_lock()){
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+
+	//copy to it
+	vkUtil::copyBuffer(stagingBuffer, mesh.indexBuffer, inputChunk.size, finalizationChunk.queue, finalizationChunk.commandBuffer);
+	
+    lock.unlock();
+	}
+	//***********end************************
+	
+
+	//destroy staging buffer
+	res.device.destroyBuffer(stagingBuffer.buffer);
+	res.device.freeMemory(stagingBuffer.bufferMemory);
 }
 
 vk::PhysicalDevice Engine::physicalDevice=nullptr;

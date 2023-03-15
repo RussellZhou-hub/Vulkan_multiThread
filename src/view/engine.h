@@ -16,8 +16,10 @@
 #include"vkMesh/mesh.h"
 #include"camera.h"
 #include"timing.h"
+#include"vkUtil/thread_pool.h"
 
-const uint32_t NUM_THREADS = 4;
+const uint32_t NUM_THREADS = 3;
+const uint32_t NUM_MESH = 32;
 
 class Engine{
 public:
@@ -70,7 +72,7 @@ public:
 	vk::CommandPool commandPool;
 	vk::CommandBuffer mainCommandBuffer;
 
-    RenderThreadResource renderThreadResources[NUM_THREADS];
+    RenderThreadResource renderThreadResources[NUM_MESH];
 
     void create_descriptor_set_layouts();
     void create_pipeline();
@@ -82,7 +84,7 @@ public:
 	void create_indexbuffer();
     void render();
 
-    std::vector<vkMesh::Mesh> meshs;
+    std::vector<vkMesh::Mesh> meshes;
 
     void update_frame(int imageIndex);
 
@@ -104,11 +106,24 @@ public:
 
     DeletionQueue _mainDeletionQueue;
 
+    ThreadPool pool;
+
     static void thread_record_draw_commands(
+        vkMesh::Mesh mesh,
         GLFWwindow* window,vk::Instance instance,vk::SurfaceKHR surface,
         RenderThreadResource res,int index,int imageIndex,vk::Fence inFlight,
         vk::Semaphore imageAvailable,vk::Semaphore renderFinished,
         std::vector<vk::Semaphore> renderFinisheds,
         std::vector<vk::Fence> inFlights
-        );
+    );
+    static void render_meshs(
+        std::vector<vkMesh::Mesh> meshs,
+        RenderThreadResource res,
+        int index,
+        int imageIndex
+    );
+    static void create_vertex_index_buffer(
+        vkMesh::Mesh& mesh,
+        RenderThreadResource res
+    );
 };

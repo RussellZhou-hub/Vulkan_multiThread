@@ -22,6 +22,8 @@ namespace vkMesh{
     public:
         std::vector<Vertex> vertices;
         std::vector<uint32_t> indices;
+        Buffer vertexBuffer;
+	    Buffer indexBuffer;
         void merge(Mesh& inputMesh);
     };
 

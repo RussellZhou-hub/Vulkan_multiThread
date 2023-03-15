@@ -30,6 +30,8 @@
 #include<thread>
 #include<mutex>
 #include<atomic>
+#include <sched.h> // for sched_setaffinity
+#include <pthread.h> // for pthread_self
 #include "vkMacro.h"
 
 #include "glm.hpp"
