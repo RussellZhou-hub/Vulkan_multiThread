@@ -269,9 +269,7 @@ void Engine::create_swapchain(){
         res.swapchainFormat = bundle.format;
 	    res.swapchainExtent = bundle.extent;
 	    res.maxFramesInFlight=static_cast<int>(swapchainFrames.size());
-    }
-    for(auto& res:renderThreadResources){ // each thread needs its own image view
-        for(auto& frame:res.swapchainFrames){
+		for(auto& frame:res.swapchainFrames){
             frame.imageView=vkImage::make_image_view(device, frame.image, res.swapchainFormat,vk::ImageAspectFlagBits::eColor);
             frame.depthBufferView=vkImage::make_image_view(device, frame.depthBuffer, frame.depthFormat, vk::ImageAspectFlagBits::eDepth);
         }
@@ -358,6 +356,7 @@ void Engine::create_pipeline(){
 	//specification.descriptorSetLayouts = { frameSetLayout /* , meshSetLayout */ };
 
 	// for main thread
+	specification.isChildThread=false;
 	specification.descriptorSetLayouts = { frameSetLayout /* , meshSetLayout */ };
         vkInit::GraphicsPipelineOutBundle output = vkInit::create_graphics_pipeline(
 		specification
@@ -535,74 +534,6 @@ void Engine::load_assets(){
 		res.indices=meshes[index].indices;
 		index++;
 	}
-
-	
-	
-	/*
-	if(NUM_THREADS==1){
-		vkMesh::Mesh mesh;
-		mesh.vertices=meshes[0].vertices;
-		mesh.indices=meshes[0].indices;
-		for(auto i =1;i<meshes.size();++i){
-			mesh.merge(meshes[i]);
-		}
-		renderThreadResources[0].vertices=mesh.vertices;
-		renderThreadResources[0].indices=mesh.indices;
-	}
-	else if(NUM_THREADS==2){
-		vkMesh::Mesh mesh;
-		mesh.vertices=meshes[0].vertices;
-		mesh.indices=meshes[0].indices;
-		int num = meshes.size()/2;
-		for(auto i =1;i<num;++i){
-			mesh.merge(meshes[i]);
-		}
-		renderThreadResources[0].vertices=mesh.vertices;
-		renderThreadResources[0].indices=mesh.indices;
-
-		vkMesh::Mesh mesh2;
-		mesh2.vertices=meshes[num].vertices;
-		mesh2.indices=meshes[num].indices;
-		for(auto i =1;i<meshes.size();++i){
-			mesh2.merge(meshes[i]);
-		}
-		renderThreadResources[1].vertices=mesh2.vertices;
-		renderThreadResources[1].indices=mesh2.indices;
-	}
-	else if(NUM_THREADS==3){
-		vkMesh::Mesh mesh;
-		mesh.vertices=meshes[0].vertices;
-		mesh.indices=meshes[0].indices;
-		int num = meshes.size()/3;
-		for(auto i =1;i<num;++i){
-			mesh.merge(meshes[i]);
-		}
-		renderThreadResources[0].vertices=mesh.vertices;
-		renderThreadResources[0].indices=mesh.indices;
-
-		vkMesh::Mesh mesh2;
-		mesh2.vertices=meshes[num].vertices;
-		mesh2.indices=meshes[num].indices;
-		int num2=2*meshes.size()/3;
-		for(auto i =1;i<num2;++i){
-			mesh2.merge(meshes[i]);
-		}
-		renderThreadResources[1].vertices=mesh2.vertices;
-		renderThreadResources[1].indices=mesh2.indices;
-
-		vkMesh::Mesh mesh3;
-		mesh3.vertices=meshes[num2].vertices;
-		mesh3.indices=meshes[num2].indices;
-		for(auto i =1;i<meshes.size();++i){
-			mesh3.merge(meshes[i]);
-		}
-		renderThreadResources[2].vertices=mesh3.vertices;
-		renderThreadResources[2].indices=mesh3.indices;
-	}
-	else{
-
-	}
-	*/
 	
 }
 
@@ -766,6 +697,7 @@ void Engine::render(){
 	renderPassInfo.pClearValues = clearValues.data();
 
 	commandBuffer.beginRenderPass(&renderPassInfo, vk::SubpassContents::eInline);
+	
 	commandBuffer.endRenderPass();
 
 	try {
@@ -823,30 +755,6 @@ void Engine::render(){
 
 	for (auto &&future : futures)
         future.wait();  // wait for asyn operation to finish
-
-/*
-	std::vector<std::thread> threads;
-    for(auto i =0;i<NUM_THREADS;i++){
-	//for(auto i =0;i<1;i++){
-            threads.push_back(std::thread(
-				thread_record_draw_commands,
-				window,
-				instance,surface,renderThreadResources[i],i,imageIndex,
-				swapchainFrames[imageIndex].inFlight,
-				swapchainFrames[frameIndex].imageAvailable,
-				swapchainFrames[frameIndex].renderFinished,
-				swapchainFrames[frameIndex].renderFinisheds,
-				swapchainFrames[frameIndex].inFlights
-				));
-    }
-
-    for(auto& thread : threads){
-        thread.join();
-        //thread.detach();
-    }
-*/
-
-	
 
 	//device.resetFences(1, &swapchainFrames[frameIndex].inFlight);
 	/*
@@ -958,9 +866,9 @@ void Engine::thread_record_draw_commands(
 		#endif
 		std::vector<vk::ClearValue> clearValues = { {colorClear, depthClear} };
 
-		renderPassInfo.clearValueCount = 0;
-		renderPassInfo.pClearValues = nullptr;
-		//renderPassInfo.pClearValues = clearValues.data();
+		renderPassInfo.clearValueCount = clearValues.size();
+		//renderPassInfo.pClearValues = &depthClear;
+		renderPassInfo.pClearValues = clearValues.data();
 
 		//for(auto i =0;i<meshes.size();++i){
 		create_vertex_index_buffer(

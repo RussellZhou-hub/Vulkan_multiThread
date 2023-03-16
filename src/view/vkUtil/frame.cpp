@@ -55,7 +55,7 @@ void vkUtil::SwapChainFrame::make_depth_resources() {
 	imageInfo.logicalDevice = logicalDevice;
 	imageInfo.physicalDevice = physicalDevice;
 	imageInfo.tiling = vk::ImageTiling::eOptimal;
-	imageInfo.usage = vk::ImageUsageFlagBits::eDepthStencilAttachment;
+	imageInfo.usage = vk::ImageUsageFlagBits::eDepthStencilAttachment|vk::ImageUsageFlagBits::eTransferDst;
 	imageInfo.memoryProperties = vk::MemoryPropertyFlagBits::eDeviceLocal;
 	imageInfo.width = width;
 	imageInfo.height = height;

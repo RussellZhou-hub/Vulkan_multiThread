@@ -156,7 +156,10 @@ vk::PipelineVertexInputStateCreateInfo vkInit::create_vertex_input_info(
 		std::vector<vk::AttachmentReference> attachmentReferences;
 
 		//Color Buffer
-		attachments.push_back(create_color_attachment(swapchainImageFormat));
+		vk::AttachmentDescription attachmentDescription = create_color_attachment(swapchainImageFormat);
+		attachmentDescription.loadOp = vk::AttachmentLoadOp::eClear;
+		attachments.push_back(attachmentDescription);
+		//attachments.push_back(create_color_attachment(swapchainImageFormat));
 		attachmentReferences.push_back(create_color_attachment_reference());
 
 		//Depth Buffer
@@ -191,7 +194,7 @@ vk::PipelineVertexInputStateCreateInfo vkInit::create_vertex_input_info(
 
 		//Depth Buffer
 		vk::AttachmentDescription depthAttachmentDescription = create_depth_attachment(depthFormat);
-		depthAttachmentDescription.loadOp = vk::AttachmentLoadOp::eLoad;
+		depthAttachmentDescription.loadOp = vk::AttachmentLoadOp::eClear;
 		attachments.push_back(depthAttachmentDescription);
 		attachmentReferences.push_back(create_depth_attachment_reference());
 

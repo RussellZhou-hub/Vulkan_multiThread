@@ -13,12 +13,13 @@
 #include"vkInit/commands.h"
 #include"vkInit/sync.h"
 #include"vkUtil/memory.h"
+#include"vkImage/image.h"
 #include"vkMesh/mesh.h"
 #include"camera.h"
 #include"timing.h"
 #include"vkUtil/thread_pool.h"
 
-const uint32_t NUM_THREADS = 3;
+const uint32_t NUM_THREADS = 4;
 const uint32_t NUM_MESH = 32;
 
 class Engine{
