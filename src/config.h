@@ -36,6 +36,7 @@
 
 #include "glm.hpp"
 #include "gtc/matrix_transform.hpp"
+#include "view/garbage_collection.h"
 
 /**
 	Data structures used for creating buffers

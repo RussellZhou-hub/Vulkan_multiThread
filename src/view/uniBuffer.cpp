@@ -87,3 +87,63 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
   updateUniformBuffer();
 }
 */
+
+/*
+const int THREAD_COUNT = 4;
+const int COMMAND_BUFFER_COUNT = 10;
+
+VkCommandBuffer secondaryBuffers[THREAD_COUNT][COMMAND_BUFFER_COUNT];
+VkCommandPool commandPools[THREAD_COUNT];
+std::vector<std::thread> threads;
+
+void submitSecondaryBuffers(int threadIndex) {
+    VkCommandBufferBeginInfo beginInfo = {};
+    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT;
+
+    for (int i = 0; i < COMMAND_BUFFER_COUNT; i++) {
+        VkCommandBuffer cmdBuffer = secondaryBuffers[threadIndex][i];
+
+        vkBeginCommandBuffer(cmdBuffer, &beginInfo);
+
+        // Record commands into the secondary command buffer...
+
+        vkEndCommandBuffer(cmdBuffer);
+
+        // Submit the secondary command buffer to the main thread...
+        VkSubmitInfo submitInfo = {};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submitInfo.commandBufferCount = 1;
+        submitInfo.pCommandBuffers = &cmdBuffer;
+
+        vkQueueSubmit(mainThreadQueue, 1, &submitInfo, VK_NULL_HANDLE);
+    }
+}
+
+int main() {
+    // Create the main thread's command pool and allocate primary command buffers...
+
+    // Spawn the secondary buffer submission threads...
+    for (int i = 0; i < THREAD_COUNT; i++) {
+        commandPools[i] = createCommandPool(device, queueFamilyIndex, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+
+        for (int j = 0; j < COMMAND_BUFFER_COUNT; j++) {
+            secondaryBuffers[i][j] = allocateCommandBuffer(device, commandPools[i], VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+        }
+
+        threads.emplace_back(submitSecondaryBuffers, i);
+    }
+
+    // Wait for all threads to finish...
+    for (auto& thread : threads) {
+        thread.join();
+    }
+
+    // Destroy the command pools...
+    for (int i = 0; i < THREAD_COUNT; i++) {
+        vkDestroyCommandPool(device, commandPools[i], nullptr);
+    }
+
+    return 0;
+}
+*/

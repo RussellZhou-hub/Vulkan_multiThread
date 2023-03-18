@@ -19,8 +19,8 @@
 #include"timing.h"
 #include"vkUtil/thread_pool.h"
 
-const uint32_t NUM_THREADS = 4;
-const uint32_t NUM_MESH = 32;
+const uint32_t NUM_THREADS = 1;
+const uint32_t NUM_MESH = 16;
 
 class Engine{
 public:
@@ -105,23 +105,20 @@ public:
     Timing timing;
     void calculateFrameRate();
 
-    DeletionQueue _mainDeletionQueue;
+    std::vector<DeletionQueue> _frame_resouce_DeletionQueues;
+    void clean_frame_resources(int index);
 
     ThreadPool pool;
 
     static void thread_record_draw_commands(
-        vkMesh::Mesh mesh,
+        vkMesh::Mesh* mesh,
         GLFWwindow* window,vk::Instance instance,vk::SurfaceKHR surface,
         RenderThreadResource res,int index,int imageIndex,vk::Fence inFlight,
+        vk::CommandBuffer* main_commandBuffer,vk::RenderPass renderPass,
         vk::Semaphore imageAvailable,vk::Semaphore renderFinished,
         std::vector<vk::Semaphore> renderFinisheds,
-        std::vector<vk::Fence> inFlights
-    );
-    static void render_meshs(
-        std::vector<vkMesh::Mesh> meshs,
-        RenderThreadResource res,
-        int index,
-        int imageIndex
+        std::vector<vk::Fence> inFlights,
+        DeletionQueue* _thread_resources_DeletionQueue
     );
     static void create_vertex_index_buffer(
         vkMesh::Mesh& mesh,

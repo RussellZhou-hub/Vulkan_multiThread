@@ -76,3 +76,28 @@ void vkInit::make_frame_command_buffers(commandBufferInputChunk inputChunk){
 			}
 		}
 }
+
+void vkInit::make_frame_secondary_command_buffers(commandBufferInputChunk inputChunk){
+
+		vk::CommandBufferAllocateInfo allocInfo = {};
+		allocInfo.commandPool = inputChunk.commandPool;
+		allocInfo.level = vk::CommandBufferLevel::eSecondary;
+		allocInfo.commandBufferCount = 1;
+		
+		//Make a command buffer for each frame
+		for (int i = 0; i < inputChunk.frames.size(); ++i) {
+			try {
+				inputChunk.frames[i].commandBuffer = inputChunk.device.allocateCommandBuffers(allocInfo)[0];
+				
+				#ifdef DEBUG_MESSAGE
+					std::cout << "Allocated command buffer for frame " << i << std::endl;
+				#endif
+			}
+			catch (vk::SystemError err) {
+
+				#ifdef DEBUG_MESSAGE
+					std::cout << "Failed to allocate command buffer for frame " << i << std::endl;
+				#endif
+			}
+		}
+}

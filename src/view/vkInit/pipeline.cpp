@@ -2,6 +2,9 @@
 
 using namespace vkInit;
 
+std::vector<vk::AttachmentDescription> attachments_global;
+		std::vector<vk::AttachmentReference> attachmentReferences_global;
+
 vk::PipelineVertexInputStateCreateInfo vkInit::create_vertex_input_info(
 		const vk::VertexInputBindingDescription& bindingDescription,
 		const std::vector<vk::VertexInputAttributeDescription>& attributeDescriptions) {
@@ -77,7 +80,7 @@ vk::PipelineVertexInputStateCreateInfo vkInit::create_vertex_input_info(
 		rasterizer.rasterizerDiscardEnable = VK_FALSE; //This flag would disable fragment output
 		rasterizer.polygonMode = vk::PolygonMode::eFill;
 		rasterizer.lineWidth = 1.0f;
-		rasterizer.cullMode = vk::CullModeFlagBits::eBack;
+		rasterizer.cullMode = vk::CullModeFlagBits::eNone;
 		rasterizer.frontFace = vk::FrontFace::eClockwise;
 		rasterizer.depthBiasEnable = VK_FALSE; //Depth bias can be useful in shadow maps.
 
@@ -156,15 +159,21 @@ vk::PipelineVertexInputStateCreateInfo vkInit::create_vertex_input_info(
 		std::vector<vk::AttachmentReference> attachmentReferences;
 
 		//Color Buffer
-		vk::AttachmentDescription attachmentDescription = create_color_attachment(swapchainImageFormat);
-		attachmentDescription.loadOp = vk::AttachmentLoadOp::eClear;
-		attachments.push_back(attachmentDescription);
-		//attachments.push_back(create_color_attachment(swapchainImageFormat));
+		//vk::AttachmentDescription attachmentDescription = create_color_attachment(swapchainImageFormat);
+		//attachmentDescription.loadOp = vk::AttachmentLoadOp::eClear;
+		//attachments.push_back(attachmentDescription);
+		attachments.push_back(create_color_attachment(swapchainImageFormat));
 		attachmentReferences.push_back(create_color_attachment_reference());
 
 		//Depth Buffer
-		attachments.push_back(create_depth_attachment(depthFormat));
+		vk::AttachmentDescription depthAttachment = create_depth_attachment(depthFormat);
+		depthAttachment.loadOp=vk::AttachmentLoadOp::eClear;
+		attachments.push_back(depthAttachment);
+		//attachments.push_back(create_depth_attachment(depthFormat));
 		attachmentReferences.push_back(create_depth_attachment_reference());
+
+		attachments_global=attachments;
+		attachmentReferences_global=attachmentReferences;
 
 		//Renderpasses are broken down into subpasses, there's always at least one.
 		vk::SubpassDescription subpass = create_subpass(attachmentReferences);
@@ -194,9 +203,11 @@ vk::PipelineVertexInputStateCreateInfo vkInit::create_vertex_input_info(
 
 		//Depth Buffer
 		vk::AttachmentDescription depthAttachmentDescription = create_depth_attachment(depthFormat);
-		depthAttachmentDescription.loadOp = vk::AttachmentLoadOp::eClear;
+		depthAttachmentDescription.loadOp = vk::AttachmentLoadOp::eLoad;
 		attachments.push_back(depthAttachmentDescription);
 		attachmentReferences.push_back(create_depth_attachment_reference());
+
+		attachments_global[1].loadOp = vk::AttachmentLoadOp::eClear;
 
 		//Renderpasses are broken down into subpasses, there's always at least one.
 		vk::SubpassDescription subpass = create_subpass(attachmentReferences);

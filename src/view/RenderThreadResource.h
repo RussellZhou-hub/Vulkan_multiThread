@@ -49,6 +49,7 @@ public:
 	//Command-related variables
 	vk::CommandPool commandPool;
 	vk::CommandBuffer threadCommandBuffer;
+	vk::CommandBufferInheritanceInfo inheritanceInfo;
 
 	// vertex buffer
 	std::vector<vkMesh::Vertex> vertices;

@@ -35,4 +35,5 @@ namespace vkInit {
 	vk::CommandBuffer make_command_buffer(commandBufferInputChunk inputChunk);
 
 	void make_frame_command_buffers(commandBufferInputChunk inputChunk);
+	void make_frame_secondary_command_buffers(commandBufferInputChunk inputChunk);
 }

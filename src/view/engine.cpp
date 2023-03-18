@@ -40,6 +40,11 @@ Engine::~Engine(){
 
 }
 
+void Engine::clean_frame_resources(int index){
+	//_frame_resouce_DeletionQueue.flush();
+	_frame_resouce_DeletionQueues[index].flush();
+}
+
 void Engine::build_glfw_window(){
     //initialize glfw
 	glfwInit();
@@ -178,7 +183,6 @@ void Engine::run(){
 				std::cout<<"yaw: "<<yaw<<" \n"<<"pitch: "<<pitch<<" \n";
 			}
 		}
-
         render();
         calculateFrameRate();
         
@@ -260,6 +264,9 @@ void Engine::create_swapchain(){
 		frame.height = swapchainExtent.height;
 
 		frame.make_depth_resources();
+
+		DeletionQueue d;
+		_frame_resouce_DeletionQueues.push_back(d);
 	}
 
     // copy to each thread to render different part of the same frame
@@ -292,7 +299,8 @@ void Engine::recreate_swapchain(){
 	create_frame_resources();
 	for(auto& res:renderThreadResources){
 		vkInit::commandBufferInputChunk commandBufferInput = { device, res.commandPool, res.swapchainFrames };
-		vkInit::make_frame_command_buffers(commandBufferInput);
+		//vkInit::make_frame_command_buffers(commandBufferInput);
+		vkInit::make_frame_secondary_command_buffers(commandBufferInput);
 	}
 	
 }
@@ -395,7 +403,8 @@ void Engine::create_framebuffers(){
 	    frameBufferInput.device = device;
 	    frameBufferInput.renderpass = res.renderpass;
 	    frameBufferInput.swapchainExtent = res.swapchainExtent;
-	    vkInit::make_framebuffers(frameBufferInput, res.swapchainFrames);
+	    //vkInit::make_framebuffers(frameBufferInput, res.swapchainFrames);
+		res.swapchainFrames=swapchainFrames;
     }
 }
 
@@ -411,7 +420,8 @@ void Engine::create_commandbuffer(){
 		res.commandPool = vkInit::make_command_pool(device, physicalDevice, surface);
 		vkInit::commandBufferInputChunk commandBufferInput = { device, res.commandPool, res.swapchainFrames };
 		res.threadCommandBuffer = vkInit::make_command_buffer(commandBufferInput);
-		vkInit::make_frame_command_buffers(commandBufferInput);
+		//vkInit::make_frame_command_buffers(commandBufferInput);
+		vkInit::make_frame_secondary_command_buffers(commandBufferInput);
 	}
 }
 
@@ -638,8 +648,8 @@ void Engine::update_frame(int imageIndex){
 void Engine::render(){
 	int frameIndex=frameNumber_atomic.load();
 
-	//device.waitForFences(1, &swapchainFrames[frameIndex].inFlight, VK_TRUE, UINT64_MAX);  // for single thread rendering
-	device.waitForFences(swapchainFrames[frameIndex].inFlights.size(), swapchainFrames[frameIndex].inFlights.data(), VK_TRUE, UINT64_MAX);    // for multi thread rendering
+	device.waitForFences(1, &swapchainFrames[frameIndex].inFlight, VK_TRUE, UINT64_MAX);  // for single thread rendering
+	//device.waitForFences(swapchainFrames[frameIndex].inFlights.size(), swapchainFrames[frameIndex].inFlights.data(), VK_TRUE, UINT64_MAX);    // for multi thread rendering
 	uint32_t imageIndex;
 	//vk::ResultValue<uint32_t> acquire;
 	try{
@@ -649,7 +659,6 @@ void Engine::render(){
 		recreate_swapchain();
 		return;
 	}
-	
 
 	vk::CommandBuffer commandBuffer = swapchainFrames[imageIndex].commandBuffer;
 
@@ -665,6 +674,7 @@ void Engine::render(){
 	update_frame(imageIndex);
 
 	vk::CommandBufferBeginInfo beginInfo = {};
+	beginInfo.flags = vk::CommandBufferUsageFlagBits::eSimultaneousUse;
 	try {
 		commandBuffer.begin(beginInfo);
 	}
@@ -687,7 +697,7 @@ void Engine::render(){
 	vk::ClearValue depthClear;
 
 	#ifdef VK_MAKE_VERSION
-	depthClear.depthStencil = vk::ClearDepthStencilValue({ 1.0f },{0});
+	depthClear.depthStencil = vk::ClearDepthStencilValue({ std::numeric_limits<float>::max() },{0});
 #else
 	depthClear.depthStencil = vk::ClearDepthStencilValue({ 1.0f,0 });
 #endif
@@ -696,8 +706,41 @@ void Engine::render(){
 	renderPassInfo.clearValueCount = clearValues.size();
 	renderPassInfo.pClearValues = clearValues.data();
 
-	commandBuffer.beginRenderPass(&renderPassInfo, vk::SubpassContents::eInline);
+	commandBuffer.beginRenderPass(&renderPassInfo, vk::SubpassContents::eSecondaryCommandBuffers);
 	
+	//device.waitIdle();
+	clean_frame_resources(frameIndex); // clean last frame's buffer
+
+	std::vector<std::future<void>> futures;
+	int meshes_size = meshes.size();
+
+    for (int i = 0; i < meshes_size; ++i){
+
+		futures.emplace_back(pool.enqueue(&Engine::thread_record_draw_commands,
+				&meshes[i],
+				window,
+				instance,surface,renderThreadResources[i],i,imageIndex,
+				swapchainFrames[imageIndex].inFlight,
+				&commandBuffer,renderpass,
+				swapchainFrames[frameIndex].imageAvailable,
+				swapchainFrames[frameIndex].renderFinished,
+				swapchainFrames[frameIndex].renderFinisheds,
+				swapchainFrames[frameIndex].inFlights,
+				&_frame_resouce_DeletionQueues[frameIndex]
+		));
+
+		_frame_resouce_DeletionQueues[frameIndex].push_function([=]() {
+        	device.destroy(meshes[i].vertexBuffer.buffer);
+			device.freeMemory(meshes[i].vertexBuffer.bufferMemory);
+			device.destroy(meshes[i].indexBuffer.buffer);
+			device.freeMemory(meshes[i].indexBuffer.bufferMemory);
+    	});
+	}
+        
+
+	for (auto &&future : futures)
+        future.wait();  // wait for asyn operation to finish
+
 	commandBuffer.endRenderPass();
 
 	try {
@@ -713,7 +756,7 @@ void Engine::render(){
 	vk::SubmitInfo submitInfo = {};
 
 	vk::Semaphore waitSemaphores[] = { swapchainFrames[frameIndex].imageAvailable };
-	vk::PipelineStageFlags waitStages[] = { vk::PipelineStageFlagBits::eColorAttachmentOutput };
+	vk::PipelineStageFlags waitStages[] = { vk::PipelineStageFlagBits::eAllCommands };
 	submitInfo.waitSemaphoreCount = 1;
 	submitInfo.pWaitSemaphores = waitSemaphores;
 	submitInfo.pWaitDstStageMask = waitStages;
@@ -724,13 +767,13 @@ void Engine::render(){
 	vk::Semaphore signalSemaphores[] = { swapchainFrames[frameIndex].renderFinished };
 	//submitInfo.signalSemaphoreCount = 1;
 	//submitInfo.pSignalSemaphores = signalSemaphores;
-	submitInfo.signalSemaphoreCount = 0;
-	submitInfo.pSignalSemaphores = nullptr;
+	submitInfo.signalSemaphoreCount = 1;
+	submitInfo.pSignalSemaphores = signalSemaphores;
 
-	//device.resetFences(1, &swapchainFrames[frameIndex].inFlight);
+	device.resetFences(1, &swapchainFrames[frameIndex].inFlight);
 
 	try {
-		graphicsQueue.submit(submitInfo, nullptr); 
+		graphicsQueue.submit(submitInfo, swapchainFrames[frameIndex].inFlight); 
 	}
 	catch (vk::SystemError err) {
 		
@@ -739,22 +782,7 @@ void Engine::render(){
 		#endif
 	}
 
-	std::vector<std::future<void>> futures;
-	int meshes_size = meshes.size();
-    for (int i = 0; i < meshes_size; ++i)
-        futures.emplace_back(pool.enqueue(&Engine::thread_record_draw_commands,
-				meshes[i],
-				window,
-				instance,surface,renderThreadResources[i],i,imageIndex,
-				swapchainFrames[imageIndex].inFlight,
-				swapchainFrames[frameIndex].imageAvailable,
-				swapchainFrames[frameIndex].renderFinished,
-				swapchainFrames[frameIndex].renderFinisheds,
-				swapchainFrames[frameIndex].inFlights
-		));
-
-	for (auto &&future : futures)
-        future.wait();  // wait for asyn operation to finish
+	
 
 	//device.resetFences(1, &swapchainFrames[frameIndex].inFlight);
 	/*
@@ -771,10 +799,13 @@ void Engine::render(){
 	
 
 	vk::PresentInfoKHR presentInfo = {};
-	//presentInfo.waitSemaphoreCount = 1;
-	//presentInfo.pWaitSemaphores = signalSemaphores;
-	presentInfo.waitSemaphoreCount = swapchainFrames[frameIndex].renderFinisheds.size();
-	presentInfo.pWaitSemaphores = swapchainFrames[frameIndex].renderFinisheds.data();
+	presentInfo.waitSemaphoreCount = 1;
+	presentInfo.pWaitSemaphores = signalSemaphores;
+	//presentInfo.waitSemaphoreCount = swapchainFrames[frameIndex].renderFinisheds.size();
+	//presentInfo.pWaitSemaphores = swapchainFrames[frameIndex].renderFinisheds.data();
+
+	//presentInfo.pSignalSemaphoreCount = 1;
+	//presentInfo.pSignalSemaphores = &swapchainFrames[frameIndex].imageAvailable;
 
 	vk::SwapchainKHR swapChains[] = { swapchain };
 	presentInfo.swapchainCount = 1;
@@ -807,12 +838,14 @@ void Engine::render(){
 std::mutex Engine::graphicQueueMutex;
 
 void Engine::thread_record_draw_commands(
-		vkMesh::Mesh mesh,
+		vkMesh::Mesh* mesh,
 		GLFWwindow* window,vk::Instance instance,vk::SurfaceKHR surface,
 		RenderThreadResource res,int index,int imageIndex,vk::Fence inFlight,
+		vk::CommandBuffer* main_commandBuffer,vk::RenderPass renderPass,
 		vk::Semaphore imageAvailable,vk::Semaphore renderFinished,
 		std::vector<vk::Semaphore> renderFinisheds,
-		std::vector<vk::Fence> inFlights
+		std::vector<vk::Fence> inFlights,
+		DeletionQueue* _thread_resources_DeletionQueue
 		){
     //std::unique_lock<std::mutex> lock(instanceMutex,std::defer_lock);
     //while(!lock.try_lock()){
@@ -837,7 +870,14 @@ void Engine::thread_record_draw_commands(
 	commandBuffer.reset();
 #endif
 
+	vk::CommandBufferInheritanceInfo inheritanceInfo;
+    inheritanceInfo.renderPass = renderPass;
+    inheritanceInfo.subpass = 0;
+
 	vk::CommandBufferBeginInfo beginInfo = {};
+	beginInfo.flags=vk::CommandBufferUsageFlagBits::eRenderPassContinue;
+	beginInfo.pInheritanceInfo =  &inheritanceInfo;
+
 	try {
 		commandBuffer.begin(beginInfo);
 	}
@@ -872,12 +912,12 @@ void Engine::thread_record_draw_commands(
 
 		//for(auto i =0;i<meshes.size();++i){
 		create_vertex_index_buffer(
-			mesh,
+			*mesh,
 			res
 		);
 		//}
 
-		commandBuffer.beginRenderPass(&renderPassInfo, vk::SubpassContents::eInline);
+		//commandBuffer.beginRenderPass(&renderPassInfo, vk::SubpassContents::eInline);
 
 		commandBuffer.bindDescriptorSets(
 			vk::PipelineBindPoint::eGraphics,
@@ -888,17 +928,17 @@ void Engine::thread_record_draw_commands(
 			
 		//vk::Buffer vertexBuffers[] = { res.vertexBuffer.buffer };
 		vk::DeviceSize offsets[] = {0};
-		commandBuffer.bindVertexBuffers(0,1,&mesh.vertexBuffer.buffer,offsets);
-		commandBuffer.bindIndexBuffer(mesh.indexBuffer.buffer, 0, vk::IndexType::eUint32);
+		commandBuffer.bindVertexBuffers(0,1,&(mesh->vertexBuffer.buffer),offsets);
+		commandBuffer.bindIndexBuffer(mesh->indexBuffer.buffer, 0, vk::IndexType::eUint32);
 
 		//todo: descriptor set for textures
 		//commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, res.pipelineLayout, 1, res.descriptorSet, nullptr);
 
 		int firstIndex=0;
 		int startInstance=0;
-		commandBuffer.drawIndexed(mesh.indices.size(), 1, firstIndex, 0, startInstance);
+		commandBuffer.drawIndexed(mesh->indices.size(), 1, firstIndex, 0, startInstance);
 	
-		commandBuffer.endRenderPass();
+		//commandBuffer.endRenderPass();
 
 	try {
 		commandBuffer.end();
@@ -912,12 +952,12 @@ void Engine::thread_record_draw_commands(
 
 	vk::SubmitInfo submitInfo = {};
 
-	vk::Semaphore waitSemaphores[] = { imageAvailable };
+	vk::Semaphore waitSemaphores[] = { renderFinished };
 	vk::PipelineStageFlags waitStages[] = { vk::PipelineStageFlagBits::eColorAttachmentOutput };
 	//submitInfo.waitSemaphoreCount = 1;
 	//submitInfo.pWaitSemaphores = waitSemaphores;
-	submitInfo.waitSemaphoreCount = 0;
-	submitInfo.pWaitSemaphores = nullptr;
+	submitInfo.waitSemaphoreCount = 1;
+	submitInfo.pWaitSemaphores = waitSemaphores;
 	submitInfo.pWaitDstStageMask = waitStages;
 
 	submitInfo.commandBufferCount = 1;
@@ -926,10 +966,11 @@ void Engine::thread_record_draw_commands(
 	vk::Semaphore signalSemaphores[] = { renderFinished };
 	//submitInfo.signalSemaphoreCount = 1;
 	//submitInfo.pSignalSemaphores = signalSemaphores;
-	submitInfo.signalSemaphoreCount = 1;
-	submitInfo.pSignalSemaphores = &renderFinisheds[index];
+	vk::Semaphore thread_signalSemaphores[] = { renderFinished,renderFinisheds[index] };
+	submitInfo.signalSemaphoreCount = 2;
+	submitInfo.pSignalSemaphores = thread_signalSemaphores;
 
-	res.device.resetFences(1, &inFlights[index]);
+	//res.device.resetFences(1, &inFlights[index]);
 	
 	//***********syn on threads************************
 	std::unique_lock<std::mutex> lock(graphicQueueMutex,std::defer_lock);
@@ -938,7 +979,8 @@ void Engine::thread_record_draw_commands(
     }
 	
 	try {
-		res.graphicsQueue.submit(submitInfo, inFlights[index]); 
+		//res.graphicsQueue.submit(submitInfo, inFlights[index]); 
+		main_commandBuffer->executeCommands({ commandBuffer });
 	}
 	catch (vk::SystemError err) {
 		
@@ -950,27 +992,13 @@ void Engine::thread_record_draw_commands(
     if (glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS) {
     	std::cout<<"thread "<<index<<" is using graphicQueue\n";
 	}
-	
-
+	//res.device.waitIdle();
     lock.unlock();
 	//***********end************************
-
-	res.device.waitIdle();
-	res.device.destroy(mesh.vertexBuffer.buffer);
-	res.device.freeMemory(mesh.vertexBuffer.bufferMemory);
-	res.device.destroy(mesh.indexBuffer.buffer);
-	res.device.freeMemory(mesh.indexBuffer.bufferMemory);
-}
-
-void Engine::render_meshs(
-        std::vector<vkMesh::Mesh> meshes,
-		RenderThreadResource res,
-        int index,
-        int imageIndex
-    ){
-		vk::CommandBuffer commandBuffer = res.swapchainFrames[imageIndex].commandBuffer;
-
-		
+	//res.device.destroy(mesh.vertexBuffer.buffer);
+	//res.device.freeMemory(mesh.vertexBuffer.bufferMemory);
+	//res.device.destroy(mesh.indexBuffer.buffer);
+	//res.device.freeMemory(mesh.indexBuffer.bufferMemory);
 }
 
 void Engine::create_vertex_index_buffer(
