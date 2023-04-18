@@ -18,9 +18,11 @@
 #include"camera.h"
 #include"timing.h"
 #include"vkUtil/thread_pool.h"
+#include"../model/tiny_obj_loader.h"
+#include"vkUtil/filePath.h"
 
-const uint32_t NUM_THREADS = 1;
-const uint32_t NUM_MESH = 16;
+const uint32_t NUM_THREADS = 54;
+const uint32_t NUM_MESH = 64;
 
 class Engine{
 public:
@@ -80,6 +82,7 @@ public:
     void create_framebuffers();
     void create_commandbuffer();
     void create_frame_resources();
+    void loadModel();
     void load_assets();
     void create_vertexbuffer();
 	void create_indexbuffer();
@@ -99,6 +102,10 @@ public:
     void scroll_process();
     bool firstMouse;
     double lastX,lastY,yaw,pitch;
+
+    // obj model related
+    std::string exePath;
+    std::string model_Name;
 
     static std::mutex graphicQueueMutex;
 

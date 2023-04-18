@@ -3,6 +3,8 @@
 Engine::Engine(int width, int height):pool(NUM_THREADS){
     this->width=width;
     this->height=height;
+	exePath= getExePath();
+	model_Name = "sponza";
 
 	yaw=81.2;
 	pitch=-1.2;
@@ -475,6 +477,18 @@ void Engine::create_frame_resources(){
 	}
 }
 
+void Engine::loadModel(){
+	tinyobj::attrib_t attrib;
+    std::vector<tinyobj::shape_t> shapes;
+    std::vector<tinyobj::material_t> materials;
+    std::string warn, err;
+
+	
+    std::string objFile= getPath_obj(exePath,model_Name);
+	std::string mtlBase = getPath_mtl(objFile);
+	std::cout<<"Executable path:"<<objFile<<std::endl;
+}
+
 void Engine::load_assets(){
 
 	glm::vec3 frontNormal = glm::vec3(0.0f, 0.0f, 1.0f);
@@ -538,13 +552,14 @@ void Engine::load_assets(){
 
 	
 	int index=0;
-	for(auto& res:renderThreadResources){
+	for(auto& res:renderThreadResources){  //每个线程分配一个专属的vertex的vector和indices的vector，在任务函数里面创建vertexbuffer和indices buffer
 		
 		res.vertices=meshes[index].vertices;
 		res.indices=meshes[index].indices;
 		index++;
 	}
 	
+	loadModel(); //load obj model
 }
 
 void Engine::create_vertexbuffer(){
