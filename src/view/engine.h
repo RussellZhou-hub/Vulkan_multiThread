@@ -106,6 +106,7 @@ public:
     // obj model related
     std::string exePath;
     std::string model_Name;
+    std::vector<vkMesh::Mesh> model_meshes;
 
     static std::mutex graphicQueueMutex;
 

@@ -1,5 +1,10 @@
 #include "engine.h"
 
+#ifndef TINYOBJLOADER_IMPLEMENTATION
+#define TINYOBJLOADER_IMPLEMENTATION
+#include "../model/tiny_obj_loader.h"
+#endif // !TINYOBJLOADER_IMPLEMENTATION
+
 Engine::Engine(int width, int height):pool(NUM_THREADS){
     this->width=width;
     this->height=height;
@@ -487,6 +492,75 @@ void Engine::loadModel(){
     std::string objFile= getPath_obj(exePath,model_Name);
 	std::string mtlBase = getPath_mtl(objFile);
 	std::cout<<"Executable path:"<<objFile<<std::endl;
+
+	if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, objFile.c_str(), mtlBase.c_str())) {
+        throw std::runtime_error(warn + err);
+    }
+
+	std::unordered_map<vkMesh::Vertex, uint32_t> uniqueVertices{};
+
+	for (const auto& mat : materials) {
+		/*
+        Material m;
+        memcpy(&m.ambient, mat.ambient, sizeof(float) * 3);
+        memcpy(&m.diffuse, mat.diffuse, sizeof(float) * 3);
+        memcpy(&m.specular, mat.specular, sizeof(float) * 3);
+        memcpy(&m.emission, mat.emission, sizeof(float) * 3);
+
+        if (!(mat.diffuse_texname.empty())) {
+            Texture tex;
+            tex.fileName = mat.diffuse_texname;
+            m.diffuse_idx = textures.size();
+            textures.push_back(tex);
+        }
+        else m.diffuse_idx = -1;
+        this->materials.push_back(m);
+		*/
+    }
+
+	for (const auto& shape : shapes) {
+		vkMesh::Mesh mesh;
+        for (const auto& index : shape.mesh.indices) {
+            vkMesh::Vertex vertex{};
+
+            vertex.pos = {
+                attrib.vertices[3 * index.vertex_index + 0],
+                attrib.vertices[3 * index.vertex_index + 1],
+                attrib.vertices[3 * index.vertex_index + 2]
+            };
+
+            vertex.normal = {
+                attrib.normals[3 * index.normal_index + 0],
+                attrib.normals[3 * index.normal_index + 1],
+                attrib.normals[3 * index.normal_index + 2]
+            };
+			/*
+            vertex.texCoord = {
+                attrib.texcoords[2 * index.texcoord_index + 0],
+                1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
+            };
+			*/
+
+            //vertex.color = { 1.0f, 1.0f, 1.0f };
+
+            if (uniqueVertices.count(vertex) == 0) {
+                uniqueVertices[vertex] = static_cast<uint32_t>(mesh.vertices.size());
+                mesh.vertices.push_back(vertex);
+            }
+            
+            mesh.indices.push_back(uniqueVertices[vertex]);
+        }
+		/*
+        for (const auto& mat_id : shape.mesh.material_ids) { //����ÿ��ƬԪ��Loop over faces��
+            Primitive p;
+            p.material_id = mat_id;
+            p.diffuse_idx = this->materials[mat_id].diffuse_idx;
+            primitives.push_back(p);
+        }
+		*/
+		model_meshes.push_back(mesh);
+    }
+
 }
 
 void Engine::load_assets(){

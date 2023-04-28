@@ -1,5 +1,6 @@
 #pragma once
 #include "../../config.h"
+#include <gtx/hash.hpp>
 
 namespace vkMesh{
     /**
@@ -16,6 +17,11 @@ namespace vkMesh{
     public:
         glm::vec3 pos;
         glm::vec3 normal;
+
+        bool operator==(const Vertex& other) const {
+            return pos == other.pos && normal==other.normal;
+            //return pos == other.pos && color == other.color && normal==other.normal && texCoord == other.texCoord;
+        }
     };
 
     class Mesh{
@@ -27,6 +33,15 @@ namespace vkMesh{
         void merge(Mesh& inputMesh);
     };
 
+}
+
+namespace std {
+    template<> struct hash<vkMesh::Vertex> {
+        size_t operator()(vkMesh::Vertex const& vertex) const {
+            return (hash<glm::vec3>()(vertex.pos) ^ hash<glm::vec3>()(vertex.normal) );
+            //return ((hash<glm::vec3>()(vertex.pos) ^ hash<glm::vec3>()(vertex.normal) ^ (hash<glm::vec3>()(vertex.color) << 1)) >> 1) ^ (hash<glm::vec2>()(vertex.texCoord) << 1);
+        }
+    };
 }
 
 

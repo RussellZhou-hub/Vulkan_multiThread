@@ -12,6 +12,10 @@ string getExePath(){
     ssize_t len=readlink("/proc/self/exe",buf,sizeof(buf)-1);
     if(len!=-1){
         buf[len]='\0';
+        char* lastSlash = strrchr(buf,'/');
+        if(lastSlash!=NULL){
+            *lastSlash='\0';
+        }
         std::cout<<"Executable path:"<<buf<<std::endl;
         return buf;
     }
