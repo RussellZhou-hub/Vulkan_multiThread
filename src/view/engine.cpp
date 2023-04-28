@@ -10,6 +10,8 @@ Engine::Engine(int width, int height):pool(NUM_THREADS){
     this->height=height;
 	exePath= getExePath();
 	model_Name = "sponza";
+	//model_Name = "cube_scene";
+	
 
 	yaw=81.2;
 	pitch=-1.2;
@@ -20,6 +22,17 @@ Engine::Engine(int width, int height):pool(NUM_THREADS){
   	cameraFront = glm::normalize(front);
 	cameraPos={-0.828088,0.0471648,-6.07124};
 	cameraUp = {0.0f,0.0f,-1.0f};
+
+	if(model_Name == "cube_scene"){
+		yaw=270;
+		pitch=-2.4;
+		front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
+  		front.y = sin(glm::radians(pitch));
+  		front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
+		cameraFront = glm::normalize(front);
+		cameraPos={1.31822,5.12078,9.87665};
+		cameraUp = {0.0f,0.0f,-1.0f};
+	}
 	  /*
 	cameraPos={1.0f,0.0f,-1.0f};
     cameraFront={-1.0f,0.0f,1.0f};
@@ -157,7 +170,7 @@ void Engine::run(){
             glfwSetMouseButtonCallback(window, mouse_button_callback);
             scroll_process();
 
-            const float cameraSpeed = 1.0f * camera.getDeltaTime(glfwGetTime()); // adjust accordingly
+            const float cameraSpeed = 10.0f * camera.getDeltaTime(glfwGetTime()); // adjust accordingly
             if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
                 //camera.pos += cameraSpeed * camera.front;
 				cameraPos += cameraSpeed * cameraFront;
@@ -801,6 +814,33 @@ void Engine::render(){
 	clean_frame_resources(frameIndex); // clean last frame's buffer
 
 	std::vector<std::future<void>> futures;
+
+#ifdef RENDER_OBJ_MODEL
+	int meshes_size = model_meshes.size();
+
+	for (int i = 0; i < meshes_size; ++i){
+
+		futures.emplace_back(pool.enqueue(&Engine::thread_record_draw_commands,
+				&model_meshes[i],
+				window,
+				instance,surface,renderThreadResources[i],i,imageIndex,
+				swapchainFrames[imageIndex].inFlight,
+				&commandBuffer,renderpass,
+				swapchainFrames[frameIndex].imageAvailable,
+				swapchainFrames[frameIndex].renderFinished,
+				swapchainFrames[frameIndex].renderFinisheds,
+				swapchainFrames[frameIndex].inFlights,
+				&_frame_resouce_DeletionQueues[frameIndex]
+		));
+
+		_frame_resouce_DeletionQueues[frameIndex].push_function([=]() {
+        	device.destroy(model_meshes[i].vertexBuffer.buffer);
+			device.freeMemory(model_meshes[i].vertexBuffer.bufferMemory);
+			device.destroy(model_meshes[i].indexBuffer.buffer);
+			device.freeMemory(model_meshes[i].indexBuffer.bufferMemory);
+    	});
+	}
+#else
 	int meshes_size = meshes.size();
 
     for (int i = 0; i < meshes_size; ++i){
@@ -825,6 +865,7 @@ void Engine::render(){
 			device.freeMemory(meshes[i].indexBuffer.bufferMemory);
     	});
 	}
+#endif
         
 
 	for (auto &&future : futures)

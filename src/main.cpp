@@ -5,7 +5,7 @@ int main(){
 
     std::cout<<"hello, vulkan\n";
 
-    Engine* engine = new Engine(640,480);
+    Engine* engine = new Engine(render_width,render_height);
 
     engine->run();
 

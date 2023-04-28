@@ -18,7 +18,8 @@ layout(location = 0) out vec4 outColor;
 
 void main() {
 	Light light;
-	light.position = vec3(-0.4,-1.64,-5.8);
+	//light.position = vec3(-0.4,-1.64,-5.8);  // for multiple geometry scene
+	light.position = vec3(4.71345,5.11657,7.19929);  // for cornell scene
 	light.color = vec3(1.0,1.0,1.0);
 	
 	vec3 lightDir = normalize(light.position - fragPosition);
