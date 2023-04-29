@@ -21,12 +21,12 @@
 #include"../model/tiny_obj_loader.h"
 #include"vkUtil/filePath.h"
 
-const uint32_t NUM_THREADS = 1;
+const uint32_t NUM_THREADS = 8;
 
 
 #define RENDER_OBJ_MODEL
 #ifdef RENDER_OBJ_MODEL
-const uint32_t NUM_MESH = 393;
+const uint32_t NUM_MESH = 64;
 const int render_width = 640;
 const int render_height = 480;
 #else

@@ -9,8 +9,9 @@ Engine::Engine(int width, int height):pool(NUM_THREADS){
     this->width=width;
     this->height=height;
 	exePath= getExePath();
-	model_Name = "sponza";
+	//model_Name = "sponza";
 	//model_Name = "cube_scene";
+	model_Name = "cornellBox_32_mesh";
 	
 
 	yaw=81.2;
@@ -23,14 +24,14 @@ Engine::Engine(int width, int height):pool(NUM_THREADS){
 	cameraPos={-0.828088,0.0471648,-6.07124};
 	cameraUp = {0.0f,0.0f,-1.0f};
 
-	if(model_Name == "cube_scene"){
+	if(model_Name == "cube_scene"||model_Name == "cornellBox_32_mesh"){
 		yaw=270;
-		pitch=-2.4;
+		pitch=-2;
 		front.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
   		front.y = sin(glm::radians(pitch));
   		front.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
 		cameraFront = glm::normalize(front);
-		cameraPos={1.31822,5.12078,9.87665};
+		cameraPos={-0.235362,0.504592,2.47708};
 		cameraUp = {0.0f,0.0f,-1.0f};
 	}
 	  /*
